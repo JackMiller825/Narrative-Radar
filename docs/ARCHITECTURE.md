@@ -1,6 +1,6 @@
 # Architecture
 
-The web process serves the desk and authenticated HTTP routes. The worker process is separate. Closing the browser does not stop it. Both talk to PostgreSQL. Redis and BullMQ carry scan jobs when Redis is up. If Redis is down, the worker still scans through a database lock so a restart does not run two overlapping scans.
+The web process serves the desk with no sign-in. The worker process is separate. Closing the browser does not stop it. Both talk to PostgreSQL. Redis and BullMQ carry scan jobs when Redis is up. If Redis is down, the worker still scans through a database lock so a restart does not run two overlapping scans.
 
 ## Flow
 

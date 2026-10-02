@@ -40,7 +40,6 @@ import {
   sendTelegramMessage,
   telegramCall,
 } from "@radar/providers";
-import bcrypt from "bcryptjs";
 import { randomBytes, randomUUID } from "node:crypto";
 import { mkdir, writeFile } from "node:fs/promises";
 import path from "node:path";
@@ -50,13 +49,12 @@ const PROVIDERS = ["rss", "hackernews", "dexscreener", "x", "openai_text", "open
 
 export async function ensureWorkspace() {
   const email = (process.env.OWNER_EMAIL || "owner@narrativeradar.local").toLowerCase();
-  const password = process.env.OWNER_PASSWORD || "change-me";
   const existing = await prisma.user.findUnique({ where: { email } });
   const user = existing ?? await prisma.user.create({
     data: {
       email,
       name: "Owner",
-      passwordHash: await bcrypt.hash(password, 10),
+      passwordHash: "disabled",
       timezone: process.env.OWNER_TIMEZONE || "UTC",
     },
   });
@@ -87,14 +85,6 @@ export async function ensureWorkspace() {
     await persistWorld(workspace.id, emptyWorld(), world);
   }
   return { user, workspace };
-}
-
-export async function authenticate(email: string, password: string) {
-  const user = await prisma.user.findUnique({ where: { email: email.toLowerCase() } });
-  if (!user) return null;
-  const ok = await bcrypt.compare(password, user.passwordHash);
-  if (!ok) return null;
-  return user;
 }
 
 export async function workspaceForUser(userId: string) {

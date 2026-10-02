@@ -20,8 +20,7 @@ Evidence from this workspace on 2 October 2026.
 | Private URLs, credential URLs, and private redirects are blocked | same |
 | Research pack includes the selected name and refuses a missing asset | same |
 | Event gap asks for a snapshot | same |
-| Unauthorized API without a session | proxy returns 401; `GET /api/desk` without a cookie returned 401 |
-| Signed-in desk | Browser pass: login, Live Radar, Scan now, visuals, shortlist move, sign out. A fresh tab does not show a false “new updates” banner. |
+| Open desk | The site opens Live Radar with no sign-in. Cross-site POSTs are still rejected. |
 | Production build | `pnpm --filter @radar/web build` generates Prisma Client, then `next build` |
 | Unit tests | 26 passed |
 

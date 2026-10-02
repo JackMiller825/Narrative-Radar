@@ -1,10 +1,7 @@
 import { requireDesk } from "@/lib/guard";
 import type { DeskData } from "@/lib/types";
-import { redirect } from "next/navigation";
-
 export default async function SaturationPage() {
   const desk = await requireDesk();
-  if (!desk) redirect("/login");
   const data = desk as unknown as DeskData;
   const groups = new Map<string, typeof data.narratives>();
   for (const narrative of data.narratives) {

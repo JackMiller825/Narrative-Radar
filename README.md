@@ -1,6 +1,6 @@
 # Narrative Radar
 
-A private research desk for emerging token narrative ideas. It reads monitored sources, keeps one card per event, explains a narrative score, and sketches a name, ticker, logo, and banner. Scores are signals and creative fit. They are not expected returns, and this app does not deploy or trade tokens.
+A research desk for emerging token narrative ideas. It reads monitored sources, keeps one card per event, explains a narrative score, and sketches a name, ticker, logo, and banner. Scores are signals and creative fit. They are not expected returns, and this app does not deploy or trade tokens.
 
 The desk starts in **demo mode** with labeled fixtures so you can use it before any API key exists. Live mode adds RSS and Hacker News. X, OpenAI, and Telegram stay visibly unconfigured until you add credentials.
 
@@ -8,15 +8,14 @@ The desk starts in **demo mode** with labeled fixtures so you can use it before 
 
 1. Install Docker Desktop and start it.
 2. Copy `.env.example` to `.env`.
-3. Set `AUTH_SECRET` to a long random string and `OWNER_PASSWORD` to a password you will remember.
-4. In a terminal opened in this folder:
+3. In a terminal opened in this folder:
 
 ```powershell
 docker compose up --build
 ```
 
-5. Open http://localhost:43123 and sign in with `OWNER_EMAIL` and `OWNER_PASSWORD`.
-6. Shut it down with `docker compose down`. Add `-v` only if you also want to delete the database volume.
+4. Open http://localhost:43123. The desk opens directly. There is no sign-in.
+5. Shut it down with `docker compose down`. Add `-v` only if you also want to delete the database volume.
 
 The web container migrates and seeds on startup. The worker container keeps scanning after you close the browser. Both stop when Docker stops. That is expected on a laptop.
 
@@ -26,7 +25,7 @@ Requirements: Node.js 22, pnpm, PostgreSQL 16, Redis.
 
 ```bash
 cp .env.example .env
-# fill AUTH_SECRET and OWNER_PASSWORD, then copy .env to apps/web, apps/worker, and packages/db
+# copy .env to apps/web, apps/worker, and packages/db
 pnpm install
 pnpm db:migrate
 pnpm db:seed
@@ -40,17 +39,11 @@ pnpm dev
 Netlify builds the Next.js app. It does not run the worker or Redis. **Scan now** still works. A schedule runs only if you also host the worker.
 
 1. Create a hosted Postgres database and copy its connection string.
-2. In Netlify, set these environment variables for both build and runtime:
-   - `DATABASE_URL`
-   - `AUTH_SECRET` (a long random string)
-   - `AUTH_URL` (the site's https origin, such as `https://your-site.netlify.app`)
-   - `OWNER_EMAIL`
-   - `OWNER_PASSWORD`
-   - `DEMO_SHOW_LOGIN_HINT` = `false`
+2. In Netlify, set `DATABASE_URL` for both build and runtime.
 3. Deploy this repository. `netlify.toml` builds with `pnpm --filter @radar/web... run build` and the Next.js plugin.
-4. The build generates Prisma Client, and when `DATABASE_URL` is set it migrates and seeds the owner.
+4. The build generates Prisma Client, and when `DATABASE_URL` is set it migrates and seeds the desk.
 
-Leave `DATABASE_URL` empty only to confirm the compile. The signed-in desk needs Postgres.
+Leave `DATABASE_URL` empty only to confirm the compile. The desk needs Postgres. Anyone who can open the site can use it.
 
 Other commands:
 

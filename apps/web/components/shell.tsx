@@ -2,7 +2,6 @@
 
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { signOutAction } from "@/app/login/actions";
 import { deskAction, formatWhen } from "@/lib/utils";
 import type { DeskData } from "@/lib/types";
 import { Bell, Bookmark, Radar, Rss, Settings, SunMedium, MoonStar, Waves } from "lucide-react";
@@ -100,9 +99,6 @@ export function Shell({ desk, children, initialTheme = "dark" }: { desk: DeskDat
             );
           })}
         </nav>
-        <form action={signOutAction} className="px-3 pb-4">
-          <button type="submit" className="rounded-2xl px-3 py-2 text-sm text-muted hover:bg-card/70">Sign out</button>
-        </form>
       </aside>
       <div>
         <header className="sticky top-0 z-20 flex flex-wrap items-center gap-3 border-b border-line bg-background/85 px-4 py-3 backdrop-blur">

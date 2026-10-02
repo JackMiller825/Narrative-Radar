@@ -1,10 +1,7 @@
 import { requireDesk } from "@/lib/guard";
 import type { DeskData } from "@/lib/types";
-import { redirect } from "next/navigation";
-
 export default async function ComparePage({ searchParams }: { searchParams: Promise<{ ids?: string }> }) {
   const desk = await requireDesk();
-  if (!desk) redirect("/login");
   const params = await searchParams;
   const ids = (params.ids ?? "").split(",").filter(Boolean).slice(0, 4);
   const narratives = (desk as unknown as DeskData).narratives.filter((narrative) => ids.includes(narrative.id));
