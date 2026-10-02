@@ -1,0 +1,16 @@
+node_modules
+.next
+dist
+coverage
+.turbo
+.env
+.env.local
+data
+*.log
+apps/web/next-env.d.ts
+packages/db/prisma/*.db
+playwright-report
+test-results
+.DS_Store
+uploads
+dump.rdb

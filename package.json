@@ -1,0 +1,28 @@
+{
+  "name": "narrative-radar",
+  "private": true,
+  "version": "0.1.0",
+  "packageManager": "pnpm@10.33.3",
+  "scripts": {
+    "dev": "concurrently -n web,worker -c cyan,magenta \"pnpm --filter @radar/web dev\" \"pnpm --filter @radar/worker dev\"",
+    "build": "pnpm --filter @radar/db generate && pnpm --filter @radar/web build",
+    "start": "pnpm --filter @radar/web start",
+    "worker": "pnpm --filter @radar/worker start",
+    "test": "vitest run",
+    "test:live": "RUN_LIVE_SMOKE=1 vitest run packages/providers/test/live.test.ts",
+    "typecheck": "pnpm -r --if-present typecheck",
+    "lint": "pnpm --filter @radar/web lint",
+    "db:generate": "pnpm --filter @radar/db generate",
+    "db:push": "pnpm --filter @radar/db exec prisma db push",
+    "db:migrate": "pnpm --filter @radar/db exec prisma migrate deploy",
+    "db:seed": "pnpm --filter @radar/db seed"
+  },
+  "devDependencies": {
+    "concurrently": "^9.2.1",
+    "typescript": "^5.9.3",
+    "vitest": "^3.2.4"
+  },
+  "pnpm": {
+    "onlyBuiltDependencies": ["esbuild", "sharp", "prisma", "@prisma/client", "@prisma/engines", "unrs-resolver"]
+  }
+}

@@ -1,0 +1,511 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id           String      @id @default(cuid())
+  email        String      @unique
+  name         String
+  passwordHash String
+  timezone     String      @default("UTC")
+  createdAt    DateTime    @default(now())
+  updatedAt    DateTime    @updatedAt
+  workspaces   Workspace[]
+}
+
+model Workspace {
+  id        String   @id @default(cuid())
+  ownerId   String
+  owner     User     @relation(fields: [ownerId], references: [id], onDelete: Cascade)
+  name      String
+  mode      String   @default("demo")
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  settings  WorkspaceSettings?
+  narratives Narrative[]
+  alerts    AlertEvent[]
+  feeds     FeedSubscription[]
+  providers ProviderConnection[]
+  rules     AlertRule[]
+  scans     ScanRun[]
+  sources   SourceItem[]
+  locks     WorkspaceLock?
+  telegram  TelegramLink?
+  events    DashboardEvent[]
+  jobs      ScheduleJob[]
+  usage     UsageLedger[]
+  audits    AuditLog[]
+  outbox    OutboxEvent[]
+  arms      AlertArm[]
+  notes     CandidateNote[]
+  feedback  Feedback[]
+  watches   WatchRule[]
+  saved     SavedCandidate[]
+}
+
+model WorkspaceSettings {
+  id                    String    @id @default(cuid())
+  workspaceId           String    @unique
+  workspace             Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  chainPreference       String    @default("ethereum")
+  schedulePreset        String    @default("5m")
+  customIntervalSeconds Int       @default(300)
+  scheduleEnabled       Boolean   @default(true)
+  scheduleVersion       Int       @default(1)
+  nextDueAt             DateTime?
+  lastAttemptedAt       DateTime?
+  lastSuccessfulAt      DateTime?
+  timezone              String    @default("UTC")
+  paused                Boolean   @default(false)
+  categories            Json
+  languages             Json
+  regions               Json
+  freshnessHours        Int       @default(72)
+  excludedKeywords      Json
+  watchedEntities       Json
+  excludedSources       Json
+  namingStyle           String    @default("cute")
+  scoreWeights          Json
+  dailyRequestLimit     Int       @default(2000)
+  textBudgetUsd         Float?
+  imageBudgetUsd        Float?
+  imageQueueCap         Int       @default(10)
+  pauseOnBudget         Boolean   @default(true)
+  retentionDays         Int       @default(30)
+  monitoringStartedAt   DateTime?
+  alertSound            Boolean   @default(false)
+  priceAssumptions      Json
+  browserNotifications  Boolean   @default(false)
+  updatedAt             DateTime  @updatedAt
+}
+
+model ProviderConnection {
+  id              String    @id @default(cuid())
+  workspaceId     String
+  workspace       Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  provider        String
+  status          String
+  detail          String    @default("")
+  lastSuccessAt   DateTime?
+  lastErrorAt     DateTime?
+  lastError       String?
+  nextPermittedAt DateTime?
+  updatedAt       DateTime  @updatedAt
+
+  @@unique([workspaceId, provider])
+}
+
+model FeedSubscription {
+  id           String    @id @default(cuid())
+  workspaceId  String
+  workspace    Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  url          String
+  title        String
+  enabled      Boolean   @default(true)
+  etag         String?
+  lastModified String?
+  lastSuccessAt DateTime?
+  lastError    String?
+  createdAt    DateTime  @default(now())
+
+  @@unique([workspaceId, url])
+}
+
+model ProviderCursor {
+  id          String   @id @default(cuid())
+  workspaceId String
+  provider    String
+  cursor      String
+  updatedAt   DateTime @updatedAt
+
+  @@unique([workspaceId, provider])
+}
+
+model ScanRun {
+  id              String    @id @default(cuid())
+  workspaceId     String
+  workspace       Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  scheduleVersion Int
+  status          String
+  trigger         String
+  startedAt       DateTime?
+  finishedAt      DateTime?
+  error           String?
+  stats           Json?
+  createdAt       DateTime  @default(now())
+}
+
+model SourceItem {
+  id               String    @id
+  workspaceId      String
+  workspace        Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  provider         String
+  providerItemId   String
+  canonicalUrl     String
+  title            String
+  excerpt          String
+  publisher        String
+  language         String?
+  publishedAt      DateTime?
+  discoveredAt     DateTime
+  fetchedAt        DateTime
+  contentHash      String
+  entities         Json
+  provenance       Json
+  deleted          Boolean   @default(false)
+  edited           Boolean   @default(false)
+  links            NarrativeSource[]
+  observations     SourceObservation[]
+
+  @@unique([workspaceId, provider, providerItemId])
+  @@index([workspaceId, contentHash])
+  @@index([workspaceId, canonicalUrl])
+}
+
+model SourceObservation {
+  id           String     @id @default(cuid())
+  sourceItemId String
+  source       SourceItem @relation(fields: [sourceItemId], references: [id], onDelete: Cascade)
+  observedAt   DateTime
+  metric       String
+  value        Float?
+
+  @@index([sourceItemId, metric, observedAt])
+}
+
+model Narrative {
+  id                   String    @id
+  workspaceId          String
+  workspace            Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  stableKey            String
+  title                String
+  category             String
+  lifecycle            String
+  provisional          Boolean   @default(false)
+  rumor                Boolean   @default(false)
+  narrativeScore       Float?
+  evidenceConfidence   Float?
+  dataCoverage         Float     @default(0)
+  collisionStatus      String    @default("not_checked")
+  independentSources   Int       @default(0)
+  sourceCount          Int       @default(0)
+  topName              String?
+  topTicker            String?
+  chainRelevance       Float     @default(0)
+  board                String    @default("new")
+  pinned               Boolean   @default(false)
+  saved                Boolean   @default(false)
+  tags                 Json
+  firstDiscoveredAt    DateTime
+  latestPublishedAt    DateTime?
+  latestMeaningfulAt   DateTime
+  latestAnalysisAt     DateTime
+  lastSeenAt           DateTime?
+  mergedIntoId         String?
+  payload              Json
+  createdAt            DateTime  @default(now())
+  updatedAt            DateTime  @updatedAt
+  sources              NarrativeSource[]
+  versions             NarrativeVersion[]
+  scores               ScoreSnapshot[]
+  brands               BrandingOption[]
+  collisions           CollisionCheck[]
+  assets               Asset[]
+  notes                CandidateNote[]
+  feedback             Feedback[]
+  savedRows            SavedCandidate[]
+
+  @@unique([workspaceId, stableKey])
+  @@index([workspaceId, narrativeScore])
+  @@index([workspaceId, latestMeaningfulAt])
+}
+
+model NarrativeSource {
+  id           String     @id @default(cuid())
+  narrativeId  String
+  narrative    Narrative  @relation(fields: [narrativeId], references: [id], onDelete: Cascade)
+  sourceItemId String
+  source       SourceItem @relation(fields: [sourceItemId], references: [id], onDelete: Cascade)
+  independent  Boolean
+  role         String
+
+  @@unique([narrativeId, sourceItemId])
+}
+
+model NarrativeVersion {
+  id          String    @id @default(cuid())
+  narrativeId String
+  narrative   Narrative @relation(fields: [narrativeId], references: [id], onDelete: Cascade)
+  version     Int
+  snapshot    Json
+  createdAt   DateTime  @default(now())
+
+  @@unique([narrativeId, version])
+}
+
+model ScoreSnapshot {
+  id            String    @id @default(cuid())
+  narrativeId   String
+  narrative     Narrative @relation(fields: [narrativeId], references: [id], onDelete: Cascade)
+  version       String
+  weights       Json
+  components    Json
+  narrativeScore Float?
+  evidenceConfidence Float?
+  dataCoverage  Float
+  calculatedAt  DateTime
+}
+
+model BrandingOption {
+  id           String    @id
+  narrativeId  String
+  narrative    Narrative @relation(fields: [narrativeId], references: [id], onDelete: Cascade)
+  rank         Int
+  name         String
+  ticker       String
+  story        String
+  wordplay     String
+  memorability Int
+  narrativeFit Int
+  style        String
+  pinned       Boolean   @default(false)
+  isTop        Boolean   @default(false)
+  userEdited   Boolean   @default(false)
+  collisionStatus String @default("not_checked")
+  checkedAt    DateTime?
+  matches      Json
+}
+
+model CollisionCheck {
+  id          String    @id @default(cuid())
+  narrativeId String
+  narrative   Narrative @relation(fields: [narrativeId], references: [id], onDelete: Cascade)
+  query       String
+  status      String
+  matches     Json
+  checkedAt   DateTime
+}
+
+model Asset {
+  id               String    @id
+  narrativeId      String
+  narrative        Narrative @relation(fields: [narrativeId], references: [id], onDelete: Cascade)
+  kind             String
+  mode             String
+  status           String
+  illustrationKey  String
+  textKey          String
+  filePath         String?
+  svg              String?
+  error            String?
+  favorite         Boolean   @default(false)
+  version          Int       @default(1)
+  prompt           String?
+  createdAt        DateTime  @default(now())
+}
+
+model CandidateNote {
+  id          String    @id @default(cuid())
+  workspaceId String
+  workspace   Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  narrativeId String
+  narrative   Narrative @relation(fields: [narrativeId], references: [id], onDelete: Cascade)
+  body        String
+  createdAt   DateTime  @default(now())
+}
+
+model SavedCandidate {
+  id          String    @id @default(cuid())
+  workspaceId String
+  workspace   Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  narrativeId String
+  narrative   Narrative @relation(fields: [narrativeId], references: [id], onDelete: Cascade)
+  createdAt   DateTime  @default(now())
+
+  @@unique([workspaceId, narrativeId])
+}
+
+model WatchRule {
+  id          String    @id @default(cuid())
+  workspaceId String
+  workspace   Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  entity      String
+
+  @@unique([workspaceId, entity])
+}
+
+model AlertRule {
+  id                   String    @id @default(cuid())
+  workspaceId          String
+  workspace            Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  name                 String
+  enabled              Boolean   @default(true)
+  eventType            String
+  minScore             Float?
+  minCoverage          Float?
+  categories           Json
+  freshnessHours       Int?
+  chainMinRelevance    Float?
+  excludeKeywords      Json
+  includeProvisional   Boolean   @default(false)
+  includeRumors        Boolean   @default(false)
+  mode                 String    @default("immediate")
+  quietStart           String?
+  quietEnd             String?
+  cooldownMinutes      Int       @default(30)
+  dailyCap             Int       @default(40)
+  channels             Json
+  priorityBypassQuiet  Boolean   @default(false)
+  hysteresis           Float     @default(5)
+}
+
+model AlertArm {
+  id          String    @id @default(cuid())
+  workspaceId String
+  workspace   Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  narrativeId String
+  ruleId      String
+  armed       Boolean   @default(true)
+  lastFiredAt DateTime?
+
+  @@unique([narrativeId, ruleId])
+}
+
+model AlertEvent {
+  id          String    @id
+  workspaceId String
+  workspace   Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  narrativeId String?
+  ruleId      String?
+  eventType   String
+  dedupeKey   String
+  title       String
+  body        String
+  status      String
+  reason      String
+  sourceUrl   String?
+  readAt      DateTime?
+  createdAt   DateTime  @default(now())
+  deliveries  NotificationDelivery[]
+
+  @@unique([workspaceId, dedupeKey])
+  @@index([workspaceId, createdAt])
+}
+
+model NotificationDelivery {
+  id           String     @id @default(cuid())
+  alertEventId String
+  alert        AlertEvent @relation(fields: [alertEventId], references: [id], onDelete: Cascade)
+  channel      String
+  status       String
+  attempts     Int        @default(0)
+  lastError    String?
+  sentAt       DateTime?
+
+  @@unique([alertEventId, channel])
+}
+
+model UsageLedger {
+  id           String    @id @default(cuid())
+  workspaceId  String
+  workspace    Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  provider     String
+  kind         String
+  units        Float
+  estimatedUsd Float?
+  measured     Boolean   @default(true)
+  reservation  Boolean   @default(false)
+  settled      Boolean   @default(true)
+  createdAt    DateTime  @default(now())
+
+  @@index([workspaceId, createdAt])
+}
+
+model OutboxEvent {
+  id          String    @id @default(cuid())
+  workspaceId String
+  workspace   Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  type        String
+  payload     Json
+  status      String    @default("pending")
+  createdAt   DateTime  @default(now())
+  processedAt DateTime?
+}
+
+model AuditLog {
+  id         String    @id @default(cuid())
+  workspaceId String
+  workspace  Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  actorId    String?
+  action     String
+  entityType String
+  entityId   String
+  detail     Json
+  createdAt  DateTime  @default(now())
+}
+
+model WorkspaceLock {
+  workspaceId String    @id
+  workspace   Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  token       String
+  holder      String
+  expiresAt   DateTime
+  heartbeatAt DateTime
+}
+
+model ScheduleJob {
+  id              String    @id @default(cuid())
+  workspaceId     String
+  workspace       Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  scheduleVersion Int
+  dueAt           DateTime
+  status          String
+  createdAt       DateTime  @default(now())
+
+  @@index([status, dueAt])
+}
+
+model TelegramLink {
+  id                String    @id @default(cuid())
+  workspaceId       String    @unique
+  workspace         Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  chatId            String?
+  pairingCode       String?
+  pairingExpiresAt  DateTime?
+  pairedAt          DateTime?
+  username          String?
+}
+
+model Feedback {
+  id          String    @id @default(cuid())
+  workspaceId String
+  workspace   Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  narrativeId String
+  narrative   Narrative @relation(fields: [narrativeId], references: [id], onDelete: Cascade)
+  kind        String
+  detail      String
+  createdAt   DateTime  @default(now())
+}
+
+model DashboardEvent {
+  id          String    @id @default(cuid())
+  workspaceId String
+  workspace   Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  seq         Int
+  type        String
+  payload     Json
+  createdAt   DateTime  @default(now())
+
+  @@unique([workspaceId, seq])
+}
+
+model WorkerHeartbeat {
+  id     String   @id
+  beatAt DateTime
+  note   String
+}

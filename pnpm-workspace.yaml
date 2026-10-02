@@ -1,0 +1,12 @@
+packages:
+  - "apps/*"
+  - "packages/*"
+
+onlyBuiltDependencies:
+  - esbuild
+  - sharp
+  - prisma
+  - "@prisma/client"
+  - "@prisma/engines"
+  - unrs-resolver
+  - msgpackr-extract

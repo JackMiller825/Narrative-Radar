@@ -1,0 +1,73 @@
+"use client";
+
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import { deskAction, formatWhen } from "@/lib/utils";
+import type { DeskData } from "@/lib/types";
+import { useRouter } from "next/navigation";
+import { useState } from "react";
+
+export function AlertsDesk({ desk }: { desk: DeskData }) {
+  const router = useRouter();
+  const [message, setMessage] = useState<string | null>(null);
+  const [soundOn, setSoundOn] = useState(false);
+  async function act(body: Record<string, unknown>) {
+    try {
+      const result = await deskAction(body);
+      setMessage(result.instructions || result.reason || "Saved.");
+      router.refresh();
+    } catch (error) {
+      setMessage(error instanceof Error ? error.message : "Failed.");
+    }
+  }
+  function enableBrowser() {
+    if (!("Notification" in window)) {
+      setMessage("This browser does not expose notifications. They would only work while the desk is open anyway.");
+      return;
+    }
+    void Notification.requestPermission().then((permission) => {
+      setMessage(permission === "granted" ? "Browser notifications are on while this tab is open. They do not arrive after you close it. Use Telegram for that." : "Permission was not granted.");
+    });
+  }
+  function enableSound() {
+    setSoundOn(true);
+    const context = new AudioContext();
+    const osc = context.createOscillator();
+    osc.frequency.value = 660;
+    osc.connect(context.destination);
+    osc.start();
+    osc.stop(context.currentTime + 0.08);
+    setMessage("Sound is armed in this tab only.");
+  }
+  return (
+    <div className="space-y-5">
+      <h1 className="display text-4xl">Alerts</h1>
+      <p className="max-w-2xl text-sm text-muted">The inbox is on by default. Browser notices stay in this tab. Telegram, once paired with your own bot, can deliver after the browser closes. A provider timeout can rarely deliver twice.</p>
+      <div className="flex flex-wrap gap-2">
+        <Button type="button" variant="outline" onClick={enableBrowser}>Enable browser notifications</Button>
+        <Button type="button" variant="outline" onClick={enableSound}>{soundOn ? "Sound armed" : "Enable sound"}</Button>
+        <Button type="button" onClick={() => act({ action: "telegram-start" })}>Start Telegram pairing</Button>
+        <Button type="button" variant="outline" onClick={() => act({ action: "telegram-check" })}>Check pairing</Button>
+        <Button type="button" variant="outline" onClick={() => act({ action: "telegram-test" })}>Send test alert</Button>
+      </div>
+      <p className="text-sm text-muted">Telegram bot {desk.telegram.configured ? "token is set on the server" : "is not configured"}. Chat {desk.telegram.paired ? `paired${desk.telegram.username ? ` as @${desk.telegram.username}` : ""}` : "not paired"}.</p>
+      {desk.telegram.pairingCode ? <p className="rounded-2xl bg-card p-3 text-sm">Send <code>/start {desk.telegram.pairingCode}</code> to your bot, then check pairing.</p> : null}
+      {message ? <p className="text-sm text-mint" role="status">{message}</p> : null}
+      <ul className="space-y-3">
+        {desk.alerts.length === 0 ? <li className="rounded-3xl border border-dashed border-line p-6 text-sm text-muted">The inbox is empty.</li> : null}
+        {desk.alerts.map((alert) => (
+          <li key={alert.id} className="rounded-3xl border border-line bg-card p-4">
+            <div className="flex flex-wrap gap-2">
+              <Badge>{alert.status}</Badge>
+              <Badge>{alert.eventType}</Badge>
+              <span className="text-xs text-muted">{formatWhen(alert.createdAt, desk.settings.timezone)}</span>
+            </div>
+            <h2 className="mt-2 font-medium">{alert.title}</h2>
+            <pre className="mt-2 whitespace-pre-wrap font-sans text-sm text-muted">{alert.body}</pre>
+            {!alert.readAt && alert.status !== "suppressed" ? <Button type="button" size="sm" className="mt-2" variant="outline" onClick={() => act({ action: "alert-read", alertId: alert.id })}>Mark read</Button> : null}
+          </li>
+        ))}
+      </ul>
+    </div>
+  );
+}
