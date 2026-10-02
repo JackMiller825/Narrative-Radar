@@ -22,7 +22,7 @@ Evidence from this workspace on 2 October 2026.
 | Event gap asks for a snapshot | same |
 | Unauthorized API without a session | proxy returns 401; `GET /api/desk` without a cookie returned 401 |
 | Signed-in desk | Browser pass: login, Live Radar, Scan now, visuals, shortlist move, sign out. A fresh tab does not show a false “new updates” banner. |
-| Production build | `pnpm --filter @radar/web build` succeeded |
+| Production build | `pnpm --filter @radar/web build` generates Prisma Client, then `next build` |
 | Unit tests | 26 passed |
 
 ## Still needing your credentials

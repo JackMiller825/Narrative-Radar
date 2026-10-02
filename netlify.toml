@@ -1,0 +1,14 @@
+# Netlify hosts the Next.js web process. Postgres must be a hosted database
+# (Neon, Supabase, or similar) via DATABASE_URL. Redis and the worker process
+# are not part of this site: Scan now still runs inside the web process, and
+# scheduled scans run only where the worker is deployed.
+[build]
+  command = "pnpm --filter @radar/web... run build"
+  publish = "apps/web/.next"
+
+[build.environment]
+  NODE_VERSION = "22"
+  PNPM_VERSION = "10.33.3"
+
+[[plugins]]
+  package = "@netlify/plugin-nextjs"

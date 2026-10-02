@@ -35,6 +35,23 @@ pnpm dev
 
 `pnpm dev` starts the site on http://127.0.0.1:43123 and the worker beside it.
 
+## Deploy the web app on Netlify
+
+Netlify builds the Next.js app. It does not run the worker or Redis. **Scan now** still works. A schedule runs only if you also host the worker.
+
+1. Create a hosted Postgres database and copy its connection string.
+2. In Netlify, set these environment variables for both build and runtime:
+   - `DATABASE_URL`
+   - `AUTH_SECRET` (a long random string)
+   - `AUTH_URL` (the site's https origin, such as `https://your-site.netlify.app`)
+   - `OWNER_EMAIL`
+   - `OWNER_PASSWORD`
+   - `DEMO_SHOW_LOGIN_HINT` = `false`
+3. Deploy this repository. `netlify.toml` builds with `pnpm --filter @radar/web... run build` and the Next.js plugin.
+4. The build generates Prisma Client, and when `DATABASE_URL` is set it migrates and seeds the owner.
+
+Leave `DATABASE_URL` empty only to confirm the compile. The signed-in desk needs Postgres.
+
 Other commands:
 
 ```bash

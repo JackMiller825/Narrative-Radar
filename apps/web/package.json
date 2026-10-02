@@ -4,7 +4,7 @@
   "private": true,
   "scripts": {
     "dev": "next dev --hostname 127.0.0.1 --port 43123",
-    "build": "next build",
+    "build": "node ../../packages/db/scripts/generate.mjs && node ../../packages/db/scripts/prepare-database.mjs && next build",
     "start": "next start --hostname 0.0.0.0 --port 43123",
     "lint": "eslint",
     "typecheck": "tsc --noEmit"
