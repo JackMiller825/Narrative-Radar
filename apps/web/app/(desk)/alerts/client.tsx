@@ -3,6 +3,7 @@
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { useLiveDesk } from "@/lib/use-live-desk";
+import { enableDesktopAlerts, notifyEnabled } from "@/lib/person-news";
 import { deskAction, formatWhen, isPublishedSnapshot } from "@/lib/utils";
 import type { DeskData } from "@/lib/types";
 import { useRouter } from "next/navigation";
@@ -24,11 +25,14 @@ export function AlertsDesk({ desk }: { desk: DeskData }) {
   }
   function enableBrowser() {
     if (!("Notification" in window)) {
-      setMessage("This browser does not expose notifications. They would only work while the desk is open anyway.");
+      setMessage("This browser does not expose notifications.");
       return;
     }
-    void Notification.requestPermission().then((permission) => {
-      setMessage(permission === "granted" ? "Browser notifications are on while this tab is open. They do not arrive after you close it. Use Telegram for that." : "Permission was not granted.");
+    void enableDesktopAlerts().then((granted) => {
+      if (granted) notifyEnabled();
+      setMessage(granted
+        ? "Desktop alerts are on. Keep this tab open and new headlines will ping you even in another app. They stop if you close the tab."
+        : "Permission was not granted.");
     });
   }
   function enableSound() {
@@ -44,7 +48,7 @@ export function AlertsDesk({ desk }: { desk: DeskData }) {
   return (
     <div className="space-y-5">
       <h1 className="display text-4xl">Alerts</h1>
-      <p className="max-w-2xl text-sm text-muted">The inbox is on by default. Browser notices stay in this tab. Telegram, once paired with your own bot, can deliver after the browser closes. A provider timeout can rarely deliver twice.</p>
+      <p className="max-w-2xl text-sm text-muted">The inbox is on by default. With permission, desktop notifications appear while this tab stays open, including when you are in another app. They stop after the tab is closed.</p>
       <div className="flex flex-wrap gap-2">
         <Button type="button" variant="outline" onClick={enableBrowser}>Enable browser notifications</Button>
         <Button type="button" variant="outline" onClick={enableSound}>{soundOn ? "Sound armed" : "Enable sound"}</Button>

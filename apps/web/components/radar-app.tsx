@@ -106,7 +106,7 @@ export function RadarApp({ desk, now, initialQuery = "" }: { desk: DeskData; now
         ) : null}
       </div>
       {!liveDesk.worker.online ? <Banner tone="warn">The worker looks offline. Scheduled scans wait until the worker process is running. Scan now still uses this web process.</Banner> : null}
-      {liveDesk.workspace.mode === "demo" ? <Banner>Demo mode is on. Cards below come from labeled fixtures. External alerts and paid image calls stay off.</Banner> : null}
+      {liveDesk.workspace.mode === "demo" ? <Banner>Demo fixtures stay on the board. Headlines about watched people are pulled live from Hacker News. Paid image calls stay off.</Banner> : null}
       {stale ? <Banner tone="warn">Scan data is stale or this desk has not completed a scan yet. Last success stays put when an attempt fails.</Banner> : null}
       {fresh > 0 ? (
         <button type="button" className="w-full rounded-2xl border border-mint/40 bg-card px-4 py-3 text-left text-sm" onClick={() => { setFresh(0); router.refresh(); }}>

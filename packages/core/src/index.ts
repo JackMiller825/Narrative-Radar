@@ -14,3 +14,4 @@ export * from "./reliability";
 export * from "./export";
 export * from "./pipeline";
 export * from "./demo";
+export * from "./people";

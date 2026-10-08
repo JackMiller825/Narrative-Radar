@@ -8,6 +8,7 @@ import {
   excerpt,
   illustrationCacheKey,
   intervalSeconds,
+  marketPeopleNames,
   nextDue,
   normalizeWeights,
   pickMotif,
@@ -29,6 +30,7 @@ import {
   type SchedulePreset,
 } from "@radar/core/browser";
 import type { DeskData } from "./types";
+import { fetchPersonStories, isRecentEnoughToNotify, notifyHeadlines } from "./person-news";
 
 const STORAGE_KEY = "narrative-radar-desk-v1";
 
@@ -58,6 +60,8 @@ type ActionResult = {
 
 let memory: Memory | null = null;
 let timer: number | null = null;
+let personTimer: number | null = null;
+let personBusy = false;
 const listeners = new Set<() => void>();
 
 export function subscribeDesk(callback: () => void) {
@@ -120,7 +124,7 @@ function applySchedule(desk: DeskData, now: string) {
 }
 
 function touchWorker(desk: DeskData, now: string) {
-  desk.worker = { online: true, beatAt: now, note: "This browser tab is running scheduled scans." };
+  desk.worker = { online: true, beatAt: now, note: "This browser tab is watching market-moving people and running scans." };
 }
 
 function recordScan(desk: DeskData, now: string, trigger: string, status: string, error: string | null) {
@@ -246,6 +250,73 @@ async function ingestLive(desk: DeskData, now: string): Promise<NormalizedItem[]
   return items;
 }
 
+function ensureMarketPeople(desk: DeskData) {
+  const defaults = marketPeopleNames();
+  const current = desk.settings.watchedEntities.map((name) => name.trim()).filter((name) => name && name.toLowerCase() !== "lisbon robot");
+  const have = new Set(current.map((name) => name.toLowerCase()));
+  const missing = defaults.filter((name) => !have.has(name.toLowerCase()));
+  desk.settings.watchedEntities = [...current, ...missing];
+}
+
+async function pullPersonHeadlines(now: string, announce: boolean): Promise<{ incoming: number; reason?: string }> {
+  if (!memory || memory.desk.settings.paused || personBusy) return { incoming: 0 };
+  personBusy = true;
+  try {
+    const watched = memory.desk.settings.watchedEntities;
+    const result = await fetchPersonStories(watched, now);
+    const known = new Set(memory.desk.narratives.flatMap((narrative) => narrative.sources.map((source) => `${source.provider}:${source.providerItemId}`)));
+    const fresh = result.items.filter((item) => !known.has(`${item.provider}:${item.providerItemId}`));
+    const draft = structuredClone(memory);
+    const reachable = result.attempted > 0 && result.failed < result.attempted;
+    setProvider(
+      draft.desk,
+      "hackernews",
+      reachable ? "healthy" : "error",
+      reachable ? `Watching ${watched.length} people on Hacker News.` : "Hacker News could not be reached from this browser.",
+      now,
+    );
+    if (fresh.length === 0) {
+      memory = draft;
+      emit();
+      return { incoming: 0 };
+    }
+    const next = applyIncoming(
+      { narratives: draft.desk.narratives, alerts: draft.pipelineAlerts, arms: draft.arms },
+      fresh,
+      optionsFor(draft.desk, draft.rules, now),
+    );
+    commitWorld(draft, next, now, "schedule");
+    for (const item of fresh) {
+      draft.desk.alerts.unshift({
+        id: `al_person_${item.providerItemId}`,
+        title: item.entities[0] ? `${item.entities[0]} is in the news` : item.title,
+        body: item.title,
+        status: "provisional",
+        reason: "watched_entity",
+        createdAt: now,
+        readAt: null,
+        eventType: "watched_entity",
+        narrativeId: draft.desk.narratives.find((narrative) => narrative.sources.some((source) => source.providerItemId === item.providerItemId))?.id ?? null,
+        sourceUrl: item.canonicalUrl,
+        deliveries: [{ channel: "browser", status: "pending", lastError: null }],
+      });
+    }
+    draft.desk.alerts = draft.desk.alerts.slice(0, 80);
+    memory = draft;
+    emit();
+    const recent = fresh.filter((item) => isRecentEnoughToNotify(item, now));
+    if (announce && recent.length > 0) notifyHeadlines(recent);
+    return {
+      incoming: fresh.length,
+      reason: `Found ${fresh.length} new headline${fresh.length === 1 ? "" : "s"} about watched people.`,
+    };
+  } catch {
+    return { incoming: 0 };
+  } finally {
+    personBusy = false;
+  }
+}
+
 function retitle(asset: NarrativeView["assets"][number], narrative: NarrativeView, name: string, ticker: string) {
   const palette = pickPalette(narrative.stableKey);
   const svg = asset.kind === "logo"
@@ -288,8 +359,12 @@ export function primeDesk(seed: DeskData) {
     };
   }
   const now = new Date().toISOString();
+  ensureMarketPeople(memory.desk);
   touchWorker(memory.desk, now);
   emit();
+  window.addEventListener("focus", () => {
+    if (document.title.startsWith("(")) document.title = "Narrative Radar";
+  });
   if (timer === null) {
     timer = window.setInterval(() => {
       if (!memory || memory.desk.settings.paused) return;
@@ -297,6 +372,12 @@ export function primeDesk(seed: DeskData) {
       if (due && new Date(due).getTime() > Date.now()) return;
       void runPublishedAction({ action: "scan", trigger: "schedule" });
     }, 5000);
+  }
+  if (personTimer === null) {
+    void pullPersonHeadlines(now, true);
+    personTimer = window.setInterval(() => {
+      void pullPersonHeadlines(new Date().toISOString(), true);
+    }, 60_000);
   }
 }
 
@@ -317,8 +398,9 @@ export async function runPublishedAction(body: Record<string, unknown>): Promise
     commitWorld(draft, next, now, trigger);
     memory = draft;
     emit();
-    const fresh = incoming.length === 0 ? " Candidates were rescored from the sources already on this desk." : ` ${incoming.length} new item${incoming.length === 1 ? "" : "s"} came in.`;
-    return { ok: true, incoming: incoming.length, reason: `Scan finished.${fresh}` };
+    const people = await pullPersonHeadlines(now, true);
+    const rescored = incoming.length === 0 ? "Candidates were rescored from the sources already on this desk." : `${incoming.length} new item${incoming.length === 1 ? "" : "s"} came in.`;
+    return { ok: true, incoming: incoming.length + people.incoming, reason: `Scan finished. ${rescored}${people.reason ? ` ${people.reason}` : ""}` };
   }
 
   if (action === "settings") {

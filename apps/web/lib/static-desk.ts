@@ -6,6 +6,7 @@ import {
   demoItems,
   emptyWorld,
   intervalSeconds,
+  marketPeopleNames,
   workPreview,
 } from "@radar/core";
 import type { DeskData } from "./types";
@@ -58,7 +59,7 @@ export function staticDesk(): DeskData {
       namingStyle: "cute",
       freshnessHours: 72,
       excludedKeywords: [],
-      watchedEntities: ["Lisbon robot"],
+      watchedEntities: marketPeopleNames(),
       categories: ["ethereum", "technology", "culture", "general"],
       languages: ["en"],
       scoreWeights: { ...DEFAULT_WEIGHTS },
