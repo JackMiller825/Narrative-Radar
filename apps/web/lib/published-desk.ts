@@ -30,6 +30,7 @@ import {
   type SchedulePreset,
 } from "@radar/core/browser";
 import type { DeskData } from "./types";
+import { attachMascotImages, focusedWatchList, mascotImageUrl } from "./mascot-images";
 import { fetchPersonStories, notifyHeadlines } from "./person-news";
 
 const STORAGE_KEY = "narrative-radar-desk-v1";
@@ -73,6 +74,7 @@ export function getDeskSnapshot(): DeskData | null {
 }
 
 function emit() {
+  if (memory) memory.desk.narratives = attachMascotImages(memory.desk.narratives);
   if (memory && typeof localStorage !== "undefined") {
     localStorage.setItem(STORAGE_KEY, JSON.stringify(memory));
   }
@@ -257,11 +259,7 @@ async function ingestLive(desk: DeskData, now: string): Promise<NormalizedItem[]
 }
 
 function ensureMarketPeople(desk: DeskData) {
-  const defaults = marketPeopleNames();
-  const current = desk.settings.watchedEntities.map((name) => name.trim()).filter((name) => name && name.toLowerCase() !== "lisbon robot");
-  const have = new Set(current.map((name) => name.toLowerCase()));
-  const missing = defaults.filter((name) => !have.has(name.toLowerCase()));
-  desk.settings.watchedEntities = [...current, ...missing];
+  desk.settings.watchedEntities = focusedWatchList(desk.settings.watchedEntities, marketPeopleNames());
 }
 
 async function pullPersonHeadlines(now: string, announce: boolean): Promise<{ incoming: number; reason?: string }> {
@@ -553,34 +551,12 @@ export async function runPublishedAction(body: Record<string, unknown>): Promise
 
   if (action === "image") {
     const narrative = narrativeAt(draft, String(body.narrativeId));
-    const kind = body.kind === "banner" ? "banner" : "logo";
-    const queued = narrative.assets.filter((asset) => asset.mode === "ai" && (asset.status === "queued" || asset.status === "generating")).length;
-    if (queued >= draft.desk.settings.imageQueueCap) return { ok: false, reason: "Image queue cap reached." };
-    const motif = pickMotif(narrative.stableKey);
-    const palette = pickPalette(narrative.stableKey);
-    const top = narrative.names.find((option) => option.isTop);
-    narrative.assets.push({
-      id: `ai_${narrative.id}_${kind}_${Date.now()}`,
-      kind,
-      mode: "ai",
-      status: "failed",
-      style: draft.desk.settings.namingStyle as NarrativeView["names"][number]["style"],
-      motif,
-      paletteName: palette.name,
-      illustrationKey: `ai-${narrative.id}-${kind}`,
-      textKey: `ai-text-${narrative.id}-${kind}`,
-      name: top?.name ?? "",
-      ticker: top?.ticker ?? "",
-      svg: null,
-      error: "OpenAI image generation is not configured. The template preview is still available.",
-      favorite: false,
-      version: 1,
-      prompt: `Original ${kind} illustration of a ${motif} character for “${top?.name ?? narrative.title}”. No text in the image.`,
-      createdAt: now,
-    });
+    const kind = body.kind === "banner" ? "banner" : body.kind === "mascot" ? "mascot" : "logo";
+    const asset = narrative.assets.find((item) => item.kind === kind && item.mode === "template");
+    if (asset) asset.imageUrl = mascotImageUrl(narrative, kind);
     memory = draft;
     emit();
-    return { ok: false, reason: "OpenAI image generation is not configured. The template preview is still available." };
+    return { ok: true, reason: "Flux is drawing that image. It replaces the sketch when the render finishes." };
   }
 
   if (action === "check-names") {

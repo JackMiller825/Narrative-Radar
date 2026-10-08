@@ -180,7 +180,7 @@ export function Shell({ desk, children, initialTheme = "dark", published = false
         <div className="px-4 py-5 md:px-6">
           {published ? (
             <p className="mb-4 rounded-2xl border border-line bg-card px-4 py-3 text-sm text-muted">
-              Manual mode fetches the latest headlines when you press Scan now. Press Start to turn on auto mode: it repeats on the interval you picked and raises a desktop notification when a new headline appears. Keep this tab open.
+              This desk runs in your browser. Headlines are about famous people who can move Ethereum, such as Vitalik Buterin, Elon Musk, Donald Trump, and Jerome Powell. Manual mode checks when you press Scan now. Start repeats that check on your interval and notifies you when a new headline appears. Keep this tab open.
             </p>
           ) : null}
           {children}

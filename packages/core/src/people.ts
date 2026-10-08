@@ -8,12 +8,12 @@ export const MARKET_PEOPLE: MarketPerson[] = [
   { name: "Elon Musk", aliases: ["elon musk"] },
   { name: "Donald Trump", aliases: ["donald trump"] },
   { name: "Jerome Powell", aliases: ["jerome powell"] },
-  { name: "Gary Gensler", aliases: ["gary gensler"] },
+  { name: "Larry Fink", aliases: ["larry fink"] },
   { name: "Michael Saylor", aliases: ["michael saylor"] },
   { name: "Brian Armstrong", aliases: ["brian armstrong"] },
   { name: "Changpeng Zhao", aliases: ["changpeng zhao", "cz binance"] },
-  { name: "Larry Fink", aliases: ["larry fink"] },
-  { name: "Justin Sun", aliases: ["justin sun"] },
+  { name: "Gary Gensler", aliases: ["gary gensler"] },
+  { name: "Sam Altman", aliases: ["sam altman"] },
 ];
 
 export function marketPeopleNames(): string[] {

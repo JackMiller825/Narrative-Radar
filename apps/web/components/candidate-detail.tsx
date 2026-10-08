@@ -1,5 +1,6 @@
 "use client";
 
+import { GeneratedImage } from "@/components/generated-image";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/input";
@@ -38,10 +39,7 @@ export function CandidateDetail({ narrative: initial }: { narrative: NarrativeVi
   return (
     <article className="space-y-4">
       <div className="flex flex-wrap items-start gap-4">
-        {logo?.svg ? (
-          // eslint-disable-next-line @next/next/no-img-element
-          <img alt="" src={`data:image/svg+xml,${encodeURIComponent(logo.svg)}`} className="h-16 w-16 rounded-full border border-line" />
-        ) : null}
+        <GeneratedImage url={mascot?.imageUrl ?? logo?.imageUrl} fallback={logo?.svg} alt="" className="h-16 w-16 rounded-2xl border border-line object-cover" />
         <div className="min-w-0 flex-1">
           <p className="text-xs uppercase tracking-[0.16em] text-mint">{narrative.category} · {narrative.lifecycle.replaceAll("_", " ")}</p>
           <h2 className="display text-3xl leading-tight">{narrative.title}</h2>
@@ -128,25 +126,19 @@ export function CandidateDetail({ narrative: initial }: { narrative: NarrativeVi
       ) : null}
       {tab === "Visuals" ? (
         <div className="space-y-3">
-          <p className="text-sm text-muted">Original mascot, logo, and banner for this narrative. Another template palette redraws all three.</p>
-          <div className="grid gap-3 sm:grid-cols-[180px_180px_1fr]">
-            {mascot?.svg ? (
-              // eslint-disable-next-line @next/next/no-img-element
-              <img alt={`${narrative.topName ?? narrative.title} mascot`} src={`data:image/svg+xml,${encodeURIComponent(mascot.svg)}`} className="aspect-square w-full rounded-2xl border border-line" />
-            ) : null}
-            {logo?.svg ? (
-              // eslint-disable-next-line @next/next/no-img-element
-              <img alt={`${narrative.topName ?? narrative.title} logo`} src={`data:image/svg+xml,${encodeURIComponent(logo.svg)}`} className="aspect-square w-full rounded-2xl border border-line" />
-            ) : null}
-            {banner?.svg ? (
-              // eslint-disable-next-line @next/next/no-img-element
-              <img alt={`${narrative.topName ?? narrative.title} banner`} src={`data:image/svg+xml,${encodeURIComponent(banner.svg)}`} className="h-full w-full rounded-2xl border border-line object-cover" />
-            ) : null}
+          <p className="text-sm text-muted">Flux draws a different mascot, logo, and banner for this story. The first render can take a few seconds.</p>
+          <div className="grid gap-3">
+            <GeneratedImage url={mascot?.imageUrl} fallback={mascot?.svg} alt={`${narrative.topName ?? narrative.title} mascot`} className="aspect-square w-full rounded-2xl border border-line object-cover" />
+            <div className="grid grid-cols-2 gap-3">
+              <GeneratedImage url={logo?.imageUrl} fallback={logo?.svg} alt={`${narrative.topName ?? narrative.title} logo`} className="aspect-square w-full rounded-2xl border border-line object-cover" />
+              <GeneratedImage url={banner?.imageUrl} fallback={banner?.svg} alt={`${narrative.topName ?? narrative.title} banner`} className="aspect-square w-full rounded-2xl border border-line object-cover" />
+            </div>
           </div>
           <div className="flex flex-wrap gap-2">
             <Button type="button" size="sm" onClick={() => run({ action: "palette", narrativeId: narrative.id })}>Another template palette</Button>
-            <Button type="button" size="sm" variant="outline" onClick={() => run({ action: "image", narrativeId: narrative.id, kind: "logo" })}>Request AI logo</Button>
-            <Button type="button" size="sm" variant="outline" onClick={() => run({ action: "image", narrativeId: narrative.id, kind: "banner" })}>Request AI banner</Button>
+            <Button type="button" size="sm" variant="outline" onClick={() => run({ action: "image", narrativeId: narrative.id, kind: "mascot" })}>Regenerate mascot</Button>
+            <Button type="button" size="sm" variant="outline" onClick={() => run({ action: "image", narrativeId: narrative.id, kind: "logo" })}>Regenerate logo</Button>
+            <Button type="button" size="sm" variant="outline" onClick={() => run({ action: "image", narrativeId: narrative.id, kind: "banner" })}>Regenerate banner</Button>
           </div>
           <ul className="space-y-2 text-sm">
             {narrative.assets.map((asset) => (

@@ -43,7 +43,6 @@ function newsQueries(people: MarketPerson[]): string[] {
   for (let index = 0; index < names.length; index += 3) {
     queries.push(`${names.slice(index, index + 3).join("+OR+")}+when:1d`);
   }
-  queries.push("ethereum+when:12h");
   return queries;
 }
 
@@ -135,7 +134,7 @@ function fromRss(item: RssItem, people: MarketPerson[], now: string, cutoff: num
   const { headline, publisher } = splitTitle(item.title);
   const body = stripTags(item.description ?? "");
   const entities = entitiesFor(`${headline} ${body}`, people);
-  if (entities.length === 0 && !/ethereum|bitcoin|crypto/i.test(`${headline} ${body}`)) return [];
+  if (entities.length === 0) return [];
   return [{
     provider: "rss",
     providerItemId: `gn-${contentHash(item.link, headline)}`,
@@ -148,7 +147,7 @@ function fromRss(item: RssItem, people: MarketPerson[], now: string, cutoff: num
     discoveredAt: now,
     fetchedAt: now,
     contentHash: contentHash(headline, body || headline),
-    entities: entities.length > 0 ? entities : ["Ethereum"],
+    entities,
     provenance: { live: true, wire: "google-news" },
   }];
 }
@@ -159,7 +158,7 @@ function fromHn(hit: AlgoliaHit, people: MarketPerson[], now: string, cutoff: nu
   if (!publishedAt || new Date(publishedAt).getTime() < cutoff) return [];
   const body = stripTags(hit.story_text ?? "");
   const entities = entitiesFor(`${hit.title} ${body}`, people);
-  if (entities.length === 0 && !/ethereum|bitcoin|crypto|vitalik|musk/i.test(`${hit.title} ${body}`)) return [];
+  if (entities.length === 0) return [];
   return [{
     provider: "hackernews",
     providerItemId: `hn-${hit.objectID}`,
@@ -172,7 +171,7 @@ function fromHn(hit: AlgoliaHit, people: MarketPerson[], now: string, cutoff: nu
     discoveredAt: now,
     fetchedAt: now,
     contentHash: contentHash(hit.title, body || hit.title),
-    entities: entities.length > 0 ? entities : ["Ethereum"],
+    entities,
     provenance: { live: true },
     discussionUrl: `https://news.ycombinator.com/item?id=${hit.objectID}`,
   }];

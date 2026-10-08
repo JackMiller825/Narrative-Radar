@@ -123,6 +123,7 @@ export interface AssetRecord {
   name: string;
   ticker: string;
   svg: string | null;
+  imageUrl?: string | null;
   error: string | null;
   favorite: boolean;
   version: number;
