@@ -1,11 +1,11 @@
-export { applyCollision, applyIncoming, describeChange, emptyWorld, refreshNarratives, type PipelineOptions } from "./pipeline";
+export { applyCollision, applyIncoming, describeChange, emptyWorld, refreshNarratives, repaintTemplates, type PipelineOptions } from "./pipeline";
 export { DEMO_NOW, replayItem } from "./demo";
 export { assertCustomInterval, intervalSeconds, nextDue, workPreview } from "./schedule";
 export { defaultNewCandidateRule, type AlertRuleInput } from "./alerts";
 export { normalizeWeights } from "./scoring";
 export { suggestNames } from "./naming";
-export { illustrationCacheKey, pickMotif, pickPalette, renderBannerSvg, renderLogoSvg, textLayerKey } from "./assets";
+export { illustrationCacheKey, pickMotif, pickPalette, renderBannerSvg, renderLogoSvg, renderMascotSvg, renderTemplateSvg, textLayerKey } from "./assets";
 export { contentHash, excerpt, stripTags } from "./text";
-export { marketPeopleNames, mentionedPeople, resolveWatchedPeople, storyMentionsPerson, MARKET_PEOPLE } from "./people";
+export { marketPeopleNames, mentionedPeople, resolveWatchedPeople, storyMentionsPerson, MARKET_PEOPLE, type MarketPerson } from "./people";
 export { buildResearchPack } from "./export";
 export type { AlertArmState, NarrativeView, NormalizedItem, PipelineAlert, SchedulePreset } from "./types";

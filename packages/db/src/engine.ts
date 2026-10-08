@@ -16,8 +16,7 @@ import {
   pickMotif,
   pickPalette,
   refreshNarratives,
-  renderBannerSvg,
-  renderLogoSvg,
+  renderTemplateSvg,
   replayItem,
   suggestNames,
   textLayerKey,
@@ -372,13 +371,11 @@ export async function cyclePalette(workspaceId: string, narrativeId: string) {
     motif,
     paletteName: palette.name,
     style: settings.namingStyle as "cute",
-    promptVersion: `template-v1-${shift}`,
+    promptVersion: `template-v2-${shift}`,
   });
-  const logo = renderLogoSvg({ motif, palette, name, ticker });
-  const banner = renderBannerSvg({ motif, palette, name, ticker, narrativeTitle: view.title });
   view.assets = view.assets.map((asset) => {
     if (asset.mode !== "template") return asset;
-    const svg = asset.kind === "logo" ? logo : banner;
+    const svg = renderTemplateSvg(asset.kind, { motif, palette, name, ticker, narrativeTitle: view.title });
     return { ...asset, motif, paletteName: palette.name, illustrationKey, svg, textKey: textLayerKey({ illustrationKey, name, ticker }), version: asset.version + 1 };
   });
   await saveView(row, view);
@@ -647,8 +644,8 @@ export async function buildExport(workspaceId: string, narrativeId: string) {
     const sharp = (await import("sharp")).default;
     for (const asset of view.assets) {
       if (!asset.svg) continue;
-      const width = asset.kind === "logo" ? 1024 : 1500;
-      const height = asset.kind === "logo" ? 1024 : 500;
+      const width = asset.kind === "banner" ? 1500 : 1024;
+      const height = asset.kind === "banner" ? 500 : 1024;
       const png = await sharp(Buffer.from(asset.svg)).resize(width, height).png().toBuffer();
       zip.file(`${asset.kind}-${asset.mode}.png`, png);
     }
@@ -948,9 +945,7 @@ async function saveView(row: { id: string; workspaceId: string }, view: Narrativ
 
 function retitle(asset: NarrativeView["assets"][number], narrative: NarrativeView, name: string, ticker: string): NarrativeView["assets"][number] {
   const palette = pickPalette(narrative.stableKey);
-  const svg = asset.kind === "logo"
-    ? renderLogoSvg({ motif: asset.motif, palette, name, ticker })
-    : renderBannerSvg({ motif: asset.motif, palette, name, ticker, narrativeTitle: narrative.title });
+  const svg = renderTemplateSvg(asset.kind, { motif: asset.motif, palette, name, ticker, narrativeTitle: narrative.title });
   return { ...asset, name, ticker, svg, textKey: textLayerKey({ illustrationKey: asset.illustrationKey, name, ticker }) };
 }
 

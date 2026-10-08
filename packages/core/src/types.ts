@@ -112,7 +112,7 @@ export interface CollisionMatch {
 
 export interface AssetRecord {
   id: string;
-  kind: "logo" | "banner";
+  kind: "logo" | "banner" | "mascot";
   mode: "template" | "ai";
   status: "ready" | "queued" | "generating" | "failed";
   style: NamingStyle;

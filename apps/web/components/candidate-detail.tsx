@@ -21,6 +21,7 @@ export function CandidateDetail({ narrative: initial }: { narrative: NarrativeVi
   const [note, setNote] = useState("");
   const logo = narrative.assets.find((asset) => asset.kind === "logo" && asset.mode === "template" && asset.svg);
   const banner = narrative.assets.find((asset) => asset.kind === "banner" && asset.mode === "template" && asset.svg);
+  const mascot = narrative.assets.find((asset) => asset.kind === "mascot" && asset.svg);
 
   async function run(body: Record<string, unknown>) {
     setMessage(null);
@@ -127,11 +128,21 @@ export function CandidateDetail({ narrative: initial }: { narrative: NarrativeVi
       ) : null}
       {tab === "Visuals" ? (
         <div className="space-y-3">
-          <p className="text-sm text-muted">Template concept. These are original vector sketches, not AI rasters and not existing token logos.</p>
-          {banner?.svg ? (
-            // eslint-disable-next-line @next/next/no-img-element
-            <img alt={`${narrative.topName ?? narrative.title} banner`} src={`data:image/svg+xml,${encodeURIComponent(banner.svg)}`} className="w-full rounded-2xl border border-line" />
-          ) : null}
+          <p className="text-sm text-muted">Original mascot, logo, and banner for this narrative. Another template palette redraws all three.</p>
+          <div className="grid gap-3 sm:grid-cols-[180px_180px_1fr]">
+            {mascot?.svg ? (
+              // eslint-disable-next-line @next/next/no-img-element
+              <img alt={`${narrative.topName ?? narrative.title} mascot`} src={`data:image/svg+xml,${encodeURIComponent(mascot.svg)}`} className="aspect-square w-full rounded-2xl border border-line" />
+            ) : null}
+            {logo?.svg ? (
+              // eslint-disable-next-line @next/next/no-img-element
+              <img alt={`${narrative.topName ?? narrative.title} logo`} src={`data:image/svg+xml,${encodeURIComponent(logo.svg)}`} className="aspect-square w-full rounded-2xl border border-line" />
+            ) : null}
+            {banner?.svg ? (
+              // eslint-disable-next-line @next/next/no-img-element
+              <img alt={`${narrative.topName ?? narrative.title} banner`} src={`data:image/svg+xml,${encodeURIComponent(banner.svg)}`} className="h-full w-full rounded-2xl border border-line object-cover" />
+            ) : null}
+          </div>
           <div className="flex flex-wrap gap-2">
             <Button type="button" size="sm" onClick={() => run({ action: "palette", narrativeId: narrative.id })}>Another template palette</Button>
             <Button type="button" size="sm" variant="outline" onClick={() => run({ action: "image", narrativeId: narrative.id, kind: "logo" })}>Request AI logo</Button>

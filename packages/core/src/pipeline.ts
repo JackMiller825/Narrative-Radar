@@ -1,5 +1,5 @@
 import { evaluateAlerts, type AlertRuleInput, type AlertSubject } from "./alerts";
-import { assertTemplateSvg, illustrationCacheKey, pickMotif, pickPalette, renderBannerSvg, renderLogoSvg, textLayerKey } from "./assets";
+import { assertTemplateSvg, illustrationCacheKey, pickMotif, pickPalette, renderTemplateSvg, textLayerKey } from "./assets";
 import { clusterItems } from "./clustering";
 import { suggestNames } from "./naming";
 import { componentValue, lifecycleFor, scoreNarrative } from "./scoring";
@@ -113,6 +113,14 @@ export function applyIncoming(world: PipelineWorld, items: NormalizedItem[], opt
   });
 
   return { narratives, alerts: [...alerts, ...decision.alerts], arms: decision.arms };
+}
+
+export function repaintTemplates(narratives: NarrativeView[], options: PipelineOptions): NarrativeView[] {
+  return narratives.map((narrative) => {
+    const next = cloneNarrative(narrative);
+    syncTemplateAssets(next, options);
+    return next;
+  });
 }
 
 export function refreshNarratives(world: PipelineWorld, options: PipelineOptions): PipelineWorld {
@@ -262,11 +270,7 @@ function mergeCluster(narrative: NarrativeView, items: NormalizedItem[], syndica
     narrative.topTicker = top?.ticker ?? null;
     narrative.timeline.push({ at: options.now, kind: "brand", text: top ? `Top creative suggestion: ${top.name} (${top.ticker}).` : "Naming produced no option." });
   }
-  if (narrative.assets.filter((asset) => asset.mode === "template" && asset.status === "ready").length < 2) {
-    narrative.assets = [...templateAssets(narrative, options), ...narrative.assets.filter((asset) => asset.mode === "ai")];
-  } else {
-    narrative.assets = narrative.assets.map((asset) => (asset.mode === "template" ? retitleAsset(asset, narrative) : asset));
-  }
+  syncTemplateAssets(narrative, options);
   for (const item of items) {
     const source = narrative.sources.find((entry) => entry.provider === item.provider && entry.providerItemId === item.providerItemId);
     if (source && item.metrics && item.metrics.length > 0) source.metrics = item.metrics;
@@ -331,6 +335,7 @@ function refreshNarrative(narrative: NarrativeView, all: NarrativeView[], option
   narrative.creativeIdea = top
     ? `Creative idea, not a factual claim: ${top.story}`
     : "No creative name has been suggested yet.";
+  syncTemplateAssets(narrative, options);
   narrative.category = categoryFor(text, narrative.entities);
   const changes: string[] = [];
   if (previousLife !== narrative.lifecycle) {
@@ -351,6 +356,18 @@ function metricsFor(narrative: NarrativeView): MetricPoint[] {
   return narrative.sources.flatMap((source) => source.metrics ?? []);
 }
 
+const TEMPLATE_VERSION = "template-v2";
+
+function syncTemplateAssets(narrative: NarrativeView, options: PipelineOptions): void {
+  const templates = narrative.assets.filter((asset) => asset.mode === "template" && asset.status === "ready");
+  const current = templates.length >= 3 && templates.every((asset) => asset.svg && asset.prompt?.includes(TEMPLATE_VERSION));
+  if (!current) {
+    narrative.assets = [...templateAssets(narrative, options), ...narrative.assets.filter((asset) => asset.mode === "ai")];
+    return;
+  }
+  narrative.assets = narrative.assets.map((asset) => (asset.mode === "template" ? retitleAsset(asset, narrative) : asset));
+}
+
 function templateAssets(narrative: NarrativeView, options: PipelineOptions): AssetRecord[] {
   const top = narrative.names.find((option) => option.isTop) ?? narrative.names[0];
   const name = top?.name ?? "Untitled";
@@ -362,13 +379,16 @@ function templateAssets(narrative: NarrativeView, options: PipelineOptions): Ass
     motif,
     paletteName: palette.name,
     style: options.style,
-    promptVersion: "template-v1",
+    promptVersion: TEMPLATE_VERSION,
   });
   const textKey = textLayerKey({ illustrationKey, name, ticker });
-  const logo = renderLogoSvg({ motif, palette, name, ticker });
-  const banner = renderBannerSvg({ motif, palette, name, ticker, narrativeTitle: narrative.title });
+  const art = { motif, palette, name, ticker, narrativeTitle: narrative.title };
+  const logo = renderTemplateSvg("logo", art);
+  const banner = renderTemplateSvg("banner", art);
+  const mascot = renderTemplateSvg("mascot", art);
   assertTemplateSvg(logo);
   assertTemplateSvg(banner);
+  assertTemplateSvg(mascot);
   const shared = {
     style: options.style,
     motif,
@@ -380,7 +400,7 @@ function templateAssets(narrative: NarrativeView, options: PipelineOptions): Ass
     error: null,
     favorite: false,
     version: 1,
-    prompt: "Template concept. Deterministic vector artwork, not an AI raster.",
+    prompt: `${TEMPLATE_VERSION}. Original mascot, logo, and banner.`,
     createdAt: options.now,
     mode: "template" as const,
     status: "ready" as const,
@@ -388,6 +408,7 @@ function templateAssets(narrative: NarrativeView, options: PipelineOptions): Ass
   return [
     { ...shared, id: `asset_${narrative.id}_logo`, kind: "logo" as const, svg: logo },
     { ...shared, id: `asset_${narrative.id}_banner`, kind: "banner" as const, svg: banner },
+    { ...shared, id: `asset_${narrative.id}_mascot`, kind: "mascot" as const, svg: mascot },
   ];
 }
 
@@ -397,9 +418,7 @@ function retitleAsset(asset: AssetRecord, narrative: NarrativeView): AssetRecord
   const palette = pickPalette(narrative.stableKey);
   const motif = asset.motif;
   const textKey = textLayerKey({ illustrationKey: asset.illustrationKey, name: top.name, ticker: top.ticker });
-  const svg = asset.kind === "logo"
-    ? renderLogoSvg({ motif, palette, name: top.name, ticker: top.ticker })
-    : renderBannerSvg({ motif, palette, name: top.name, ticker: top.ticker, narrativeTitle: narrative.title });
+  const svg = renderTemplateSvg(asset.kind, { motif, palette, name: top.name, ticker: top.ticker, narrativeTitle: narrative.title });
   return { ...asset, name: top.name, ticker: top.ticker, textKey, svg, prompt: "Text layer updated. Illustration cache was kept." };
 }
 

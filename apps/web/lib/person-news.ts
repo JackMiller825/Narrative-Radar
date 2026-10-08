@@ -1,7 +1,7 @@
-import { contentHash, excerpt, resolveWatchedPeople, storyMentionsPerson, stripTags, type NormalizedItem } from "@radar/core/browser";
+import { contentHash, excerpt, mentionedPeople, resolveWatchedPeople, stripTags, type MarketPerson, type NormalizedItem } from "@radar/core/browser";
 
-const LOOKBACK_MS = 72 * 60 * 60 * 1000;
-export const NOTIFY_WINDOW_MS = 45 * 60 * 1000;
+const LOOKBACK_MS = 12 * 60 * 60 * 1000;
+export const NOTIFY_WINDOW_MS = 3 * 60 * 60 * 1000;
 
 type AlgoliaHit = {
   objectID?: string;
@@ -11,31 +11,69 @@ type AlgoliaHit = {
   story_text?: string | null;
 };
 
-export async function fetchPersonStories(watched: string[], now: string): Promise<{ items: NormalizedItem[]; failed: number; attempted: number }> {
+type RssItem = { title?: string; link?: string; pubDate?: string; description?: string };
+
+export async function fetchPersonStories(watched: string[], now: string): Promise<{ items: NormalizedItem[]; failed: number; attempted: number; google: number }> {
   const people = resolveWatchedPeople(watched);
   const cutoff = new Date(now).getTime() - LOOKBACK_MS;
-  const batches = await Promise.all(people.map(async (person) => {
-    try {
-      const url = new URL("https://hn.algolia.com/api/v1/search_by_date");
-      url.searchParams.set("query", `"${person.name}"`);
-      url.searchParams.set("tags", "story");
-      url.searchParams.set("hitsPerPage", "8");
-      const response = await fetch(url);
-      if (!response.ok) return { items: [] as NormalizedItem[], failed: true };
-      const body = (await response.json()) as { hits?: AlgoliaHit[] };
-      return { items: (body.hits ?? []).flatMap((hit) => toItem(hit, person, now, cutoff)), failed: false };
-    } catch {
-      return { items: [] as NormalizedItem[], failed: true };
-    }
-  }));
+  const queries = newsQueries(people);
+  const batches = await Promise.all([
+    ...queries.map((query) => googleFeed(query, people, now, cutoff)),
+    hackerNews(people, now, cutoff),
+  ]);
   const seen = new Set<string>();
   const items: NormalizedItem[] = [];
-  for (const item of batches.flatMap((batch) => batch.items)) {
-    if (seen.has(item.providerItemId)) continue;
-    seen.add(item.providerItemId);
+  for (const item of batches.flatMap((batch) => batch.items).sort((a, b) => (b.publishedAt ?? "").localeCompare(a.publishedAt ?? ""))) {
+    const key = item.canonicalUrl || item.providerItemId;
+    if (seen.has(key)) continue;
+    seen.add(key);
     items.push(item);
   }
-  return { items, failed: batches.filter((batch) => batch.failed).length, attempted: people.length };
+  return {
+    items: items.slice(0, 60),
+    failed: batches.filter((batch) => batch.failed).length,
+    attempted: batches.length,
+    google: batches.filter((batch) => batch.source === "google" && !batch.failed).reduce((sum, batch) => sum + batch.items.length, 0),
+  };
+}
+
+function newsQueries(people: MarketPerson[]): string[] {
+  const names = people.map((person) => person.name.replaceAll(" ", "+"));
+  const queries: string[] = [];
+  for (let index = 0; index < names.length; index += 3) {
+    queries.push(`${names.slice(index, index + 3).join("+OR+")}+when:1d`);
+  }
+  queries.push("ethereum+when:12h");
+  return queries;
+}
+
+async function googleFeed(query: string, people: MarketPerson[], now: string, cutoff: number): Promise<{ items: NormalizedItem[]; failed: boolean; source: string }> {
+  try {
+    const rss = `https://news.google.com/rss/search?q=${query}&hl=en-US&gl=US&ceid=US:en`;
+    const url = `https://api.rss2json.com/v1/api.json?rss_url=${encodeURIComponent(rss)}`;
+    const response = await fetch(url);
+    if (!response.ok) return { items: [], failed: true, source: "google" };
+    const body = (await response.json()) as { status?: string; items?: RssItem[] };
+    if (body.status !== "ok") return { items: [], failed: true, source: "google" };
+    return { items: (body.items ?? []).flatMap((item) => fromRss(item, people, now, cutoff)), failed: false, source: "google" };
+  } catch {
+    return { items: [], failed: true, source: "google" };
+  }
+}
+
+async function hackerNews(people: MarketPerson[], now: string, cutoff: number): Promise<{ items: NormalizedItem[]; failed: boolean; source: string }> {
+  try {
+    const url = new URL("https://hn.algolia.com/api/v1/search_by_date");
+    url.searchParams.set("tags", "story");
+    url.searchParams.set("hitsPerPage", "40");
+    url.searchParams.set("numericFilters", `created_at_i>${Math.floor(cutoff / 1000)}`);
+    const response = await fetch(url);
+    if (!response.ok) return { items: [], failed: true, source: "hn" };
+    const body = (await response.json()) as { hits?: AlgoliaHit[] };
+    return { items: (body.hits ?? []).flatMap((hit) => fromHn(hit, people, now, cutoff)), failed: false, source: "hn" };
+  } catch {
+    return { items: [], failed: true, source: "hn" };
+  }
 }
 
 export function isRecentEnoughToNotify(item: NormalizedItem, now: string): boolean {
@@ -90,18 +128,42 @@ export function notifyEnabled() {
   });
 }
 
-function toItem(hit: AlgoliaHit, person: { name: string; aliases: string[] }, now: string, cutoff: number): NormalizedItem[] {
+function fromRss(item: RssItem, people: MarketPerson[], now: string, cutoff: number): NormalizedItem[] {
+  if (!item.title || !item.link) return [];
+  const publishedAt = parsePub(item.pubDate);
+  if (!publishedAt || new Date(publishedAt).getTime() < cutoff) return [];
+  const { headline, publisher } = splitTitle(item.title);
+  const body = stripTags(item.description ?? "");
+  const entities = entitiesFor(`${headline} ${body}`, people);
+  if (entities.length === 0 && !/ethereum|bitcoin|crypto/i.test(`${headline} ${body}`)) return [];
+  return [{
+    provider: "rss",
+    providerItemId: `gn-${contentHash(item.link, headline)}`,
+    canonicalUrl: item.link,
+    title: headline,
+    excerpt: excerpt(body || headline),
+    publisher,
+    language: "en",
+    publishedAt,
+    discoveredAt: now,
+    fetchedAt: now,
+    contentHash: contentHash(headline, body || headline),
+    entities: entities.length > 0 ? entities : ["Ethereum"],
+    provenance: { live: true, wire: "google-news" },
+  }];
+}
+
+function fromHn(hit: AlgoliaHit, people: MarketPerson[], now: string, cutoff: number): NormalizedItem[] {
   if (!hit.objectID || !hit.title) return [];
   const publishedAt = hit.created_at && !Number.isNaN(Date.parse(hit.created_at)) ? new Date(hit.created_at).toISOString() : null;
   if (!publishedAt || new Date(publishedAt).getTime() < cutoff) return [];
   const body = stripTags(hit.story_text ?? "");
-  const text = `${hit.title} ${body}`;
-  if (storyMentionsPerson(text, person) === false) return [];
-  const canonicalUrl = hit.url || `https://news.ycombinator.com/item?id=${hit.objectID}`;
+  const entities = entitiesFor(`${hit.title} ${body}`, people);
+  if (entities.length === 0 && !/ethereum|bitcoin|crypto|vitalik|musk/i.test(`${hit.title} ${body}`)) return [];
   return [{
     provider: "hackernews",
     providerItemId: `hn-${hit.objectID}`,
-    canonicalUrl,
+    canonicalUrl: hit.url || `https://news.ycombinator.com/item?id=${hit.objectID}`,
     title: hit.title,
     excerpt: excerpt(body || hit.title),
     publisher: "Hacker News",
@@ -110,10 +172,28 @@ function toItem(hit: AlgoliaHit, person: { name: string; aliases: string[] }, no
     discoveredAt: now,
     fetchedAt: now,
     contentHash: contentHash(hit.title, body || hit.title),
-    entities: [person.name],
-    provenance: { live: true, person: person.name },
+    entities: entities.length > 0 ? entities : ["Ethereum"],
+    provenance: { live: true },
     discussionUrl: `https://news.ycombinator.com/item?id=${hit.objectID}`,
   }];
+}
+
+function entitiesFor(text: string, people: MarketPerson[]): string[] {
+  return mentionedPeople(text, people);
+}
+
+function splitTitle(title: string): { headline: string; publisher: string } {
+  const index = title.lastIndexOf(" - ");
+  if (index < 8) return { headline: title, publisher: "Google News" };
+  return { headline: title.slice(0, index), publisher: title.slice(index + 3) };
+}
+
+function parsePub(value: string | undefined): string | null {
+  if (!value) return null;
+  const normalized = value.includes("T") ? value : `${value.replace(" ", "T")}Z`;
+  const time = Date.parse(normalized);
+  if (Number.isNaN(time)) return null;
+  return new Date(time).toISOString();
 }
 
 function beep() {

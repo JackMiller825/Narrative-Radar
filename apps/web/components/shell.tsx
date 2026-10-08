@@ -2,14 +2,14 @@
 
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { enableDesktopAlerts, notifyEnabled } from "@/lib/person-news";
+import { enableDesktopAlerts } from "@/lib/person-news";
 import { useLiveDesk } from "@/lib/use-live-desk";
 import { deskAction, formatWhen } from "@/lib/utils";
 import type { DeskData } from "@/lib/types";
 import { Bell, Bookmark, Radar, Rss, Settings, SunMedium, MoonStar, Waves } from "lucide-react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import { useEffect, useState, useSyncExternalStore } from "react";
+import { useState, useSyncExternalStore } from "react";
 
 const themeListeners = new Set<() => void>();
 function subscribeTheme(callback: () => void) {
@@ -44,14 +44,40 @@ export function Shell({ desk, children, initialTheme = "dark", published = false
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
-  const [alertsOn, setAlertsOn] = useState(false);
-  useEffect(() => {
-    setAlertsOn(typeof Notification !== "undefined" && Notification.permission === "granted");
-  }, []);
   const theme = useSyncExternalStore(subscribeTheme, getTheme, () => initialTheme);
   const unread = liveDesk.alerts.filter((alert) => !alert.readAt && alert.status !== "suppressed").length;
-  const status = liveDesk.settings.paused ? "Paused" : liveDesk.worker.online ? "Worker live" : "Worker offline";
-  const tone = liveDesk.settings.paused ? "text-amber-300" : liveDesk.worker.online ? "text-mint" : "text-amber-300";
+  const auto = liveDesk.settings.autoScan === true;
+  const status = liveDesk.settings.paused ? "Paused" : auto ? "Auto" : "Manual";
+  const tone = liveDesk.settings.paused ? "text-amber-300" : "text-mint";
+
+  async function startAuto() {
+    setBusy(true);
+    setError(null);
+    setNotice(null);
+    try {
+      const granted = await enableDesktopAlerts();
+      const result = await deskAction({ action: "watch", enabled: true });
+      setNotice(typeof result.reason === "string" ? result.reason : "Auto mode is on.");
+      if (!granted) setError("Auto mode is running, but notification permission was not granted.");
+    } catch (reason) {
+      setError(reason instanceof Error ? reason.message : "Could not start auto mode.");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function stopAuto() {
+    setBusy(true);
+    setError(null);
+    try {
+      const result = await deskAction({ action: "watch", enabled: false });
+      setNotice(typeof result.reason === "string" ? result.reason : "Manual mode.");
+    } catch (reason) {
+      setError(reason instanceof Error ? reason.message : "Could not stop auto mode.");
+    } finally {
+      setBusy(false);
+    }
+  }
 
   async function scan() {
     setBusy(true);
@@ -79,18 +105,6 @@ export function Shell({ desk, children, initialTheme = "dark", published = false
       setError(reason instanceof Error ? reason.message : "Could not change the interval.");
     } finally {
       setBusy(false);
-    }
-  }
-
-  async function enableAlerts() {
-    setError(null);
-    const granted = await enableDesktopAlerts();
-    setAlertsOn(granted);
-    if (granted) {
-      notifyEnabled();
-      setNotice("Desktop alerts are on. Keep this tab open and new headlines will ping you in other apps.");
-    } else {
-      setError("Notification permission was not granted. Allow notifications for this site, then try again.");
     }
   }
 
@@ -156,8 +170,8 @@ export function Shell({ desk, children, initialTheme = "dark", published = false
             <Button type="button" variant="outline" size="sm" onClick={toggleTheme} aria-label={theme === "dark" ? "Switch to light mode" : "Switch to dark mode"}>
               {theme === "dark" ? <SunMedium size={16} /> : <MoonStar size={16} />}
             </Button>
-            {published && alertsOn ? <p className="text-xs text-mint">Alerts on</p> : null}
-            {published && !alertsOn ? <Button type="button" variant="outline" size="sm" onClick={enableAlerts}>Enable alerts</Button> : null}
+            {published && auto ? <Button type="button" variant="outline" size="sm" onClick={stopAuto} disabled={busy}>Stop</Button> : null}
+            {published && !auto ? <Button type="button" size="sm" onClick={startAuto} disabled={busy}>Start</Button> : null}
             <Button type="button" size="sm" onClick={scan} disabled={busy}>{busy ? "Scanning…" : "Scan now"}</Button>
           </div>
           {error ? <p className="w-full text-sm text-red-300" role="alert">{error}</p> : null}
@@ -166,7 +180,7 @@ export function Shell({ desk, children, initialTheme = "dark", published = false
         <div className="px-4 py-5 md:px-6">
           {published ? (
             <p className="mb-4 rounded-2xl border border-line bg-card px-4 py-3 text-sm text-muted">
-              This desk runs in your browser. Headlines about Vitalik Buterin, Elon Musk, and the other watched people are checked about once a minute. Click Enable alerts, then leave this tab open: new stories raise a desktop notification even when you are in another app.
+              Manual mode fetches the latest headlines when you press Scan now. Press Start to turn on auto mode: it repeats on the interval you picked and raises a desktop notification when a new headline appears. Keep this tab open.
             </p>
           ) : null}
           {children}

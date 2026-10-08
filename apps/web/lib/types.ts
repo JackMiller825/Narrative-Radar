@@ -23,6 +23,7 @@ export interface DeskData {
     retentionDays: number;
     alertSound: boolean;
     browserNotifications: boolean;
+    autoScan?: boolean;
     nextDueAt: string | null;
     lastAttemptedAt: string | null;
     lastSuccessfulAt: string | null;

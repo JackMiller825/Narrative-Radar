@@ -14,8 +14,8 @@ import {
   pickMotif,
   pickPalette,
   refreshNarratives,
-  renderBannerSvg,
-  renderLogoSvg,
+  repaintTemplates,
+  renderTemplateSvg,
   replayItem,
   stripTags,
   suggestNames,
@@ -30,7 +30,7 @@ import {
   type SchedulePreset,
 } from "@radar/core/browser";
 import type { DeskData } from "./types";
-import { fetchPersonStories, isRecentEnoughToNotify, notifyHeadlines } from "./person-news";
+import { fetchPersonStories, notifyHeadlines } from "./person-news";
 
 const STORAGE_KEY = "narrative-radar-desk-v1";
 
@@ -60,7 +60,6 @@ type ActionResult = {
 
 let memory: Memory | null = null;
 let timer: number | null = null;
-let personTimer: number | null = null;
 let personBusy = false;
 const listeners = new Set<() => void>();
 
@@ -124,7 +123,14 @@ function applySchedule(desk: DeskData, now: string) {
 }
 
 function touchWorker(desk: DeskData, now: string) {
-  desk.worker = { online: true, beatAt: now, note: "This browser tab is watching market-moving people and running scans." };
+  const auto = desk.settings.autoScan === true;
+  desk.worker = {
+    online: true,
+    beatAt: now,
+    note: auto
+      ? `Auto mode checks every ${desk.schedule?.seconds ?? 300}s and notifies when a new headline appears.`
+      : "Manual mode. Scan now fetches the latest headlines. Press Start for automatic checks.",
+  };
 }
 
 function recordScan(desk: DeskData, now: string, trigger: string, status: string, error: string | null) {
@@ -270,9 +276,13 @@ async function pullPersonHeadlines(now: string, announce: boolean): Promise<{ in
     const reachable = result.attempted > 0 && result.failed < result.attempted;
     setProvider(
       draft.desk,
-      "hackernews",
+      "rss",
       reachable ? "healthy" : "error",
-      reachable ? `Watching ${watched.length} people on Hacker News.` : "Hacker News could not be reached from this browser.",
+      result.google > 0
+        ? `Google News returned ${result.google} headline${result.google === 1 ? "" : "s"} from the last 12 hours.`
+        : reachable
+          ? "Hacker News responded. Google News did not return a feed this time."
+          : "Headlines could not be reached from this browser.",
       now,
     );
     if (fresh.length === 0) {
@@ -304,7 +314,7 @@ async function pullPersonHeadlines(now: string, announce: boolean): Promise<{ in
     draft.desk.alerts = draft.desk.alerts.slice(0, 80);
     memory = draft;
     emit();
-    const recent = fresh.filter((item) => isRecentEnoughToNotify(item, now));
+    const recent = [...fresh].sort((a, b) => (b.publishedAt ?? "").localeCompare(a.publishedAt ?? ""));
     if (announce && recent.length > 0) notifyHeadlines(recent);
     return {
       incoming: fresh.length,
@@ -319,9 +329,7 @@ async function pullPersonHeadlines(now: string, announce: boolean): Promise<{ in
 
 function retitle(asset: NarrativeView["assets"][number], narrative: NarrativeView, name: string, ticker: string) {
   const palette = pickPalette(narrative.stableKey);
-  const svg = asset.kind === "logo"
-    ? renderLogoSvg({ motif: asset.motif, palette, name, ticker })
-    : renderBannerSvg({ motif: asset.motif, palette, name, ticker, narrativeTitle: narrative.title });
+  const svg = renderTemplateSvg(asset.kind, { motif: asset.motif, palette, name, ticker, narrativeTitle: narrative.title });
   return { ...asset, name, ticker, svg, textKey: textLayerKey({ illustrationKey: asset.illustrationKey, name, ticker }) };
 }
 
@@ -360,6 +368,8 @@ export function primeDesk(seed: DeskData) {
   }
   const now = new Date().toISOString();
   ensureMarketPeople(memory.desk);
+  memory.desk.settings.autoScan = memory.desk.settings.autoScan === true;
+  memory.desk.narratives = repaintTemplates(memory.desk.narratives, optionsFor(memory.desk, memory.rules, now));
   touchWorker(memory.desk, now);
   emit();
   window.addEventListener("focus", () => {
@@ -367,17 +377,11 @@ export function primeDesk(seed: DeskData) {
   });
   if (timer === null) {
     timer = window.setInterval(() => {
-      if (!memory || memory.desk.settings.paused) return;
+      if (!memory || !memory.desk.settings.autoScan || memory.desk.settings.paused) return;
       const due = memory.desk.settings.nextDueAt;
       if (due && new Date(due).getTime() > Date.now()) return;
       void runPublishedAction({ action: "scan", trigger: "schedule" });
     }, 5000);
-  }
-  if (personTimer === null) {
-    void pullPersonHeadlines(now, true);
-    personTimer = window.setInterval(() => {
-      void pullPersonHeadlines(new Date().toISOString(), true);
-    }, 60_000);
   }
 }
 
@@ -398,9 +402,21 @@ export async function runPublishedAction(body: Record<string, unknown>): Promise
     commitWorld(draft, next, now, trigger);
     memory = draft;
     emit();
-    const people = await pullPersonHeadlines(now, true);
+    const people = await pullPersonHeadlines(now, trigger === "schedule");
     const rescored = incoming.length === 0 ? "Candidates were rescored from the sources already on this desk." : `${incoming.length} new item${incoming.length === 1 ? "" : "s"} came in.`;
-    return { ok: true, incoming: incoming.length + people.incoming, reason: `Scan finished. ${rescored}${people.reason ? ` ${people.reason}` : ""}` };
+    return { ok: true, incoming: incoming.length + people.incoming, reason: people.reason ? `Scan finished. ${people.reason}` : `Scan finished. ${rescored}` };
+  }
+
+  if (action === "watch") {
+    const enabled = body.enabled === true;
+    draft.desk.settings.autoScan = enabled;
+    applySchedule(draft.desk, now);
+    touchWorker(draft.desk, now);
+    memory = draft;
+    emit();
+    if (!enabled) return { ok: true, reason: "Manual mode. Scan now fetches the latest headlines." };
+    const result = await runPublishedAction({ action: "scan", trigger: "schedule" });
+    return { ok: true, incoming: result.incoming, reason: `Auto mode is on. ${result.reason ?? "The first check just ran."}` };
   }
 
   if (action === "settings") {
@@ -523,13 +539,11 @@ export async function runPublishedAction(body: Record<string, unknown>): Promise
       motif,
       paletteName: palette.name,
       style: draft.desk.settings.namingStyle as "cute",
-      promptVersion: `template-v1-${shift}`,
+      promptVersion: `template-v2-${shift}`,
     });
-    const logo = renderLogoSvg({ motif, palette, name, ticker });
-    const banner = renderBannerSvg({ motif, palette, name, ticker, narrativeTitle: narrative.title });
     narrative.assets = narrative.assets.map((asset) => {
       if (asset.mode !== "template") return asset;
-      const svg = asset.kind === "logo" ? logo : banner;
+      const svg = renderTemplateSvg(asset.kind, { motif, palette, name, ticker, narrativeTitle: narrative.title });
       return { ...asset, motif, paletteName: palette.name, illustrationKey, svg, textKey: textLayerKey({ illustrationKey, name, ticker }), version: asset.version + 1 };
     });
     memory = draft;

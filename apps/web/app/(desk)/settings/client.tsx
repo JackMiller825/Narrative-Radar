@@ -88,7 +88,7 @@ export function SettingsForm({ desk }: { desk: DeskData }) {
       <label className="block text-sm">Excluded keywords, comma separated
         <Input className="mt-1" value={keywords} onChange={(event) => setKeywords(event.target.value)} />
       </label>
-      <label className="block text-sm">Watched people, comma separated. Headlines that mention these names are checked about once a minute.
+      <label className="block text-sm">Watched people, comma separated. Scan now and auto mode look these names up.
         <Input className="mt-1" value={watched} onChange={(event) => setWatched(event.target.value)} />
       </label>
       <label className="block text-sm">Daily request limit
