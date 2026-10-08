@@ -192,6 +192,7 @@ export interface NarrativeView {
   mergedIntoId: string | null;
   topName: string | null;
   topTicker: string | null;
+  visualBrief?: import("./visual-brief").VisualBrief;
 }
 
 export interface PipelineAlert {

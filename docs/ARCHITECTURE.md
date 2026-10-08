@@ -26,7 +26,7 @@ Items join an event when titles or content hashes match, or when the event signa
 
 ## Assets
 
-Template SVG is drawn from a fixed set of motifs and palettes. The illustration cache key ignores the name. Changing a name redraws the text layer only. AI images, when configured, are extra versions. A failed AI job leaves the template in place.
+Each candidate stores a visual brief: species, expression, action, and signature prop chosen from the story. Template SVG uses that brief. The mascot is 1024×1024 with no lettering. The logo is 1024×1024 and the banner is 1500×500; both include the full name and one `$TICKER`. The illustration cache key still ignores the name, so a rename redraws the text layer. AI images, when configured, are extra versions and are not labeled as the template. A failed AI job leaves the template in place. No provider comparison has been run.
 
 ## Alerts
 

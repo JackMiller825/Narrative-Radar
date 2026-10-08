@@ -605,7 +605,7 @@ export async function runPublishedAction(body: Record<string, unknown>): Promise
       motif,
       paletteName: palette.name,
       style: draft.desk.settings.namingStyle as "cute",
-      promptVersion: `template-v2-${shift}`,
+      promptVersion: `template-v3-${shift}`,
     });
     narrative.assets = narrative.assets.map((asset) => {
       if (asset.mode !== "template") return asset;

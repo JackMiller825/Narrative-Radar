@@ -12,7 +12,7 @@ Done for the local pipeline. RSS/Atom and Hacker News adapters, dedupe, clusteri
 
 ## Phase 3 — Branding
 
-Done for template art and name suggestions. Five name/ticker options, collision states, SVG logo and banner, PNG export when sharp is available, and an OpenAI image job that stays failed-and-honest until a model id is configured.
+Name suggestions and collision states are in place. Each candidate now gets a persisted visual brief and three labeled template drawings: a 1024×1024 mascot with no lettering, a 1024×1024 logo, and a 1500×500 banner. The logo and banner include the full name and a single `$TICKER`. The character and prop follow the story, such as a robot with a task folder. OpenAI image jobs still stay failed-and-honest until `OPENAI_API_KEY`, `OPENAI_IMAGE_MODEL`, and `OPENAI_IMAGE_SIZE` are set. No image-provider comparison has been run. See `docs/IMAGE_EVALUATION.md`.
 
 ## Phase 4 — Alerts
 

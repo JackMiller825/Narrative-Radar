@@ -1,5 +1,6 @@
 import type { Motif, NamingStyle } from "./types";
 import { sha1, xmlEscape } from "./text";
+import { buildVisualBrief, type VisualBrief } from "./visual-brief";
 
 export interface Palette {
   name: string;
@@ -50,6 +51,8 @@ export interface ArtInput {
   name: string;
   ticker: string;
   narrativeTitle?: string;
+  narrativeId?: string;
+  brief?: VisualBrief;
 }
 
 export function renderTemplateSvg(kind: "logo" | "banner" | "mascot", input: ArtInput): string {
@@ -59,50 +62,93 @@ export function renderTemplateSvg(kind: "logo" | "banner" | "mascot", input: Art
 }
 
 export function renderLogoSvg(input: ArtInput): string {
-  const label = xmlEscape(input.ticker.slice(0, 8));
+  const brief = briefFor(input);
+  const lines = nameLines(brief.name);
+  const size = lines.length > 1 ? 44 : fitSize(brief.name, 860, 56);
+  const text = lines.map((line, index) => {
+    const y = 800 + index * (size + 8);
+    return `<text x="512" y="${y}" text-anchor="middle" font-family="ui-sans-serif, sans-serif" font-size="${size}" font-weight="700" fill="${input.palette.fg}">${xmlEscape(line)}</text>`;
+  }).join("");
+  const tickerY = 800 + lines.length * (size + 8) + 8;
   return `<?xml version="1.0" encoding="UTF-8"?>
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024" width="1024" height="1024" role="img" aria-label="${xmlEscape(input.name)} logo">
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024" width="1024" height="1024" role="img" aria-label="${xmlEscape(brief.name)} logo" data-asset="logo" data-label="Template concept">
   ${defs(input.palette)}
   <rect width="1024" height="1024" rx="220" fill="url(#sky)"/>
-  <circle cx="512" cy="430" r="300" fill="url(#glow)" opacity="0.9"/>
-  ${character(input.motif, input.palette, 512, 470, 1.05)}
-  <rect x="262" y="790" width="500" height="128" rx="64" fill="${input.palette.bg}" opacity="0.72"/>
-  <text x="512" y="874" text-anchor="middle" font-family="ui-sans-serif, sans-serif" font-size="72" font-weight="700" fill="${input.palette.fg}">${label}</text>
+  <circle cx="512" cy="390" r="250" fill="url(#glow)" opacity="0.9"/>
+  ${character(brief.motif, input.palette, 512, 420, 0.82)}
+  ${signatureProp(brief, input.palette, 690, 520, 1)}
+  <rect x="112" y="760" width="800" height="200" rx="48" fill="${input.palette.bg}" opacity="0.78"/>
+  ${text}
+  <text x="512" y="${tickerY}" text-anchor="middle" font-family="ui-sans-serif, sans-serif" font-size="36" font-weight="700" fill="${input.palette.accent}">${xmlEscape(brief.displayTicker)}</text>
 </svg>`;
 }
 
 export function renderMascotSvg(input: ArtInput): string {
+  const brief = briefFor(input);
   return `<?xml version="1.0" encoding="UTF-8"?>
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024" width="1024" height="1024" role="img" aria-label="${xmlEscape(input.name)} mascot">
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024" width="1024" height="1024" role="img" aria-label="${xmlEscape(brief.name)} mascot" data-asset="mascot" data-species="${xmlEscape(brief.species)}" data-signature="${xmlEscape(brief.signature)}" data-label="Template concept">
   ${defs(input.palette)}
   <rect width="1024" height="1024" rx="80" fill="url(#sky)"/>
   <ellipse cx="512" cy="860" rx="280" ry="46" fill="${input.palette.bg}" opacity="0.45"/>
   ${sparkles(input.palette)}
-  ${character(input.motif, input.palette, 512, 500, 1.35)}
+  ${character(brief.motif, input.palette, 470, 500, 1.2)}
+  ${signatureProp(brief, input.palette, 700, 620, 1.4)}
 </svg>`;
 }
 
 export function renderBannerSvg(input: ArtInput & { narrativeTitle: string }): string {
-  const name = xmlEscape(input.name);
-  const ticker = xmlEscape(input.ticker);
-  const title = xmlEscape(truncate(input.narrativeTitle, 78));
+  const brief = briefFor(input);
+  const hook = xmlEscape(truncate(brief.hook, 90));
   return `<?xml version="1.0" encoding="UTF-8"?>
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1500 500" width="1500" height="500" role="img" aria-label="${name} banner">
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1500 500" width="1500" height="500" role="img" aria-label="${xmlEscape(brief.name)} banner" data-asset="banner" data-label="Template concept">
   ${defs(input.palette)}
   <rect width="1500" height="500" fill="url(#sky)"/>
-  <circle cx="1180" cy="80" r="180" fill="${input.palette.accent}" opacity="0.18"/>
-  <circle cx="1320" cy="420" r="140" fill="${input.palette.ink}" opacity="0.2"/>
-  ${character(input.motif, input.palette, 250, 270, 0.72)}
-  <text x="470" y="190" font-family="ui-sans-serif, sans-serif" font-size="64" font-weight="700" fill="${input.palette.fg}">${name}</text>
-  <rect x="470" y="214" width="${Math.max(120, ticker.length * 28)}" height="52" rx="26" fill="${input.palette.accent}"/>
-  <text x="494" y="250" font-family="ui-sans-serif, sans-serif" font-size="28" font-weight="700" fill="${input.palette.bg}">${ticker}</text>
-  <text x="470" y="340" font-family="ui-sans-serif, sans-serif" font-size="28" fill="${input.palette.ink}">${title}</text>
+  <circle cx="1280" cy="80" r="140" fill="${input.palette.accent}" opacity="0.18"/>
+  ${character(brief.motif, input.palette, 230, 270, 0.62)}
+  ${signatureProp(brief, input.palette, 390, 300, 0.9)}
+  <text x="500" y="180" font-family="ui-sans-serif, sans-serif" font-size="${fitSize(brief.name, 900, 56)}" font-weight="700" fill="${input.palette.fg}">${xmlEscape(brief.name)}</text>
+  <text x="500" y="250" font-family="ui-sans-serif, sans-serif" font-size="36" font-weight="700" fill="${input.palette.accent}">${xmlEscape(brief.displayTicker)}</text>
+  <text x="500" y="330" font-family="ui-sans-serif, sans-serif" font-size="24" fill="${input.palette.ink}">${hook}</text>
 </svg>`;
 }
 
 function truncate(value: string, limit: number): string {
   if (value.length <= limit) return value;
   return `${value.slice(0, limit - 1)}…`;
+}
+
+function briefFor(input: ArtInput): VisualBrief {
+  return input.brief ?? buildVisualBrief({
+    narrativeId: input.narrativeId ?? input.name,
+    title: input.narrativeTitle ?? input.name,
+    name: input.name,
+    ticker: input.ticker,
+  });
+}
+
+function fitSize(text: string, maxWidth: number, maxSize: number): number {
+  const estimated = Math.floor(maxWidth / Math.max(text.length * 0.62, 1));
+  return Math.max(22, Math.min(maxSize, estimated));
+}
+
+function nameLines(name: string): string[] {
+  if (name.length <= 18 || !name.includes(" ")) return [name];
+  const words = name.split(/\s+/);
+  const mid = Math.ceil(words.length / 2);
+  return [words.slice(0, mid).join(" "), words.slice(mid).join(" ")];
+}
+
+function signatureProp(brief: VisualBrief, palette: Palette, x: number, y: number, scale: number): string {
+  const paper = palette.fg;
+  const ink = palette.bg;
+  const accent = palette.accent;
+  let shape = `<rect x="-28" y="-36" width="56" height="72" rx="8" fill="${paper}" stroke="${ink}" stroke-width="4"/>`;
+  if (brief.signature === "lantern") shape = `<rect x="-16" y="-40" width="32" height="44" rx="8" fill="${accent}" stroke="${paper}" stroke-width="4"/><rect x="-6" y="4" width="12" height="28" fill="${ink}"/>`;
+  if (brief.signature === "lily pad") shape = `<ellipse cx="0" cy="0" rx="46" ry="22" fill="${accent}"/><circle cx="8" cy="-4" r="10" fill="${paper}"/>`;
+  if (brief.signature === "scored loaf") shape = `<ellipse cx="0" cy="0" rx="40" ry="24" fill="${paper}" stroke="${ink}" stroke-width="4"/><path d="M-20 -4 Q0 16 20 -4" fill="none" stroke="${ink}" stroke-width="3"/>`;
+  if (brief.signature === "picture frame") shape = `<rect x="-30" y="-36" width="60" height="72" fill="${paper}" stroke="${accent}" stroke-width="8"/>`;
+  if (brief.signature === "rocket pack") shape = `<polygon points="0,-40 28,28 -28,28" fill="${accent}" stroke="${paper}" stroke-width="4"/>`;
+  return `<g data-signature="${xmlEscape(brief.signature)}" transform="translate(${x} ${y}) scale(${scale})">${shape}</g>`;
 }
 
 function defs(palette: Palette): string {

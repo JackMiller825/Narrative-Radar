@@ -371,7 +371,7 @@ export async function cyclePalette(workspaceId: string, narrativeId: string) {
     motif,
     paletteName: palette.name,
     style: settings.namingStyle as "cute",
-    promptVersion: `template-v2-${shift}`,
+    promptVersion: `template-v3-${shift}`,
   });
   view.assets = view.assets.map((asset) => {
     if (asset.mode !== "template") return asset;

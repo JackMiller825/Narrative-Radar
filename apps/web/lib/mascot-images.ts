@@ -1,4 +1,4 @@
-import type { NarrativeView } from "@radar/core/browser";
+import { buildVisualBrief, type NarrativeView } from "@radar/core/browser";
 
 const PREVIOUS_WATCH = new Set([
   "vitalik buterin",
@@ -34,8 +34,14 @@ export function mascotImageUrl(narrative: Pick<NarrativeView, "id" | "title" | "
   const frame = FRAMES[kind];
   const name = narrative.topName ?? "unnamed narrative";
   const ticker = narrative.topTicker ?? "";
-  const title = narrative.title.replace(/[^\w\s,'-]/g, " ").replace(/\s+/g, " ").trim().slice(0, 120);
-  const prompt = `${frame.pose} named ${name} ${ticker}. Story: ${title}. Distinctive digital illustration, unique silhouette and color, no text, no letters, no logo, no watermark`;
+  const brief = buildVisualBrief({
+    narrativeId: narrative.id,
+    title: narrative.title,
+    name,
+    ticker,
+  });
+  const lettering = kind === "mascot" ? "no text, no letters, no logo, no watermark" : `leave clear space for the exact name ${name} and ${brief.displayTicker}`;
+  const prompt = `${frame.pose}. ${brief.hook} Species: ${brief.species}. Signature prop: ${brief.signature}. ${lettering}`;
   return `https://placeholdr.dev/${frame.width}x${frame.height}/${encodeURIComponent(prompt)}?style=digital-art&seed=${frame.seed}`;
 }
 

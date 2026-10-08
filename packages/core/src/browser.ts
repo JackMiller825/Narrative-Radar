@@ -8,5 +8,6 @@ export { illustrationCacheKey, pickMotif, pickPalette, renderBannerSvg, renderLo
 export { contentHash, excerpt, stripTags } from "./text";
 export { marketPeopleNames, mentionedPeople, resolveWatchedPeople, storyMentionsPerson, MARKET_PEOPLE, type MarketPerson } from "./people";
 export { assessStory, describeTokenNarrative, laneEntities, materialReports, type NarrativeLane, type ReportCandidate, type ReportedNarrative, type StoryFit } from "./narrative-fit";
+export { buildVisualBrief, canonicalTicker, displayTicker, type VisualBrief } from "./visual-brief";
 export { buildResearchPack } from "./export";
 export type { AlertArmState, NarrativeView, NormalizedItem, PipelineAlert, SchedulePreset } from "./types";

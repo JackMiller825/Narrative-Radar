@@ -22,7 +22,8 @@ Evidence from this workspace on 2 October 2026.
 | Event gap asks for a snapshot | same |
 | Open desk | The site opens Live Radar with no sign-in. Cross-site POSTs are still rejected. |
 | Production build | `pnpm --filter @radar/web build` generates Prisma Client, then `next build` |
-| Unit tests | 26 passed |
+| Unit tests | Core tests, including the visual-brief cases, are run with `pnpm exec vitest run` |
+| Visual brief, exact template view boxes, full name, and one `$TICKER` | `packages/core/test/visual-brief.test.ts` |
 
 ## Still needing your credentials
 
@@ -38,4 +39,5 @@ Evidence from this workspace on 2 October 2026.
 - Dollar amounts are assumptions you type in. They are not invoices. Empty assumptions show no dollar figure.
 - Local scanning runs only while this machine and the worker process are up.
 - Exactly-once delivery to Telegram is not promised. A timeout after the bot accepts a message can show a rare duplicate.
-- Core browser flows were exercised in a desktop session. Playwright is not wired up in this repo.
+- Decoded PNG dimensions and OCR of logo lettering were not run as a pixel test in this session. The template SVG view boxes are 1024×1024 and 1500×500, and the research-pack export resizes those SVG files with sharp when that module loads. A missing sharp install writes a note instead of a fake PNG.
+- Image-provider comparison, transparent cutouts, and vision review were not run. `docs/IMAGE_EVALUATION.md` records that status. Template drawings are not labeled as AI-generated.

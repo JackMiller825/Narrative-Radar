@@ -7,6 +7,7 @@ import { Textarea } from "@/components/ui/input";
 import { downloadNarrativePack } from "@/lib/published-desk";
 import { useLiveNarratives } from "@/lib/use-live-desk";
 import { deskAction, isPublishedSnapshot } from "@/lib/utils";
+import { buildVisualBrief } from "@radar/core/browser";
 import type { NarrativeView } from "@radar/core";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
@@ -23,6 +24,14 @@ export function CandidateDetail({ narrative: initial }: { narrative: NarrativeVi
   const logo = narrative.assets.find((asset) => asset.kind === "logo" && asset.mode === "template" && asset.svg);
   const banner = narrative.assets.find((asset) => asset.kind === "banner" && asset.mode === "template" && asset.svg);
   const mascot = narrative.assets.find((asset) => asset.kind === "mascot" && asset.svg);
+  const brief = narrative.visualBrief ?? buildVisualBrief({
+    narrativeId: narrative.id,
+    title: narrative.title,
+    summary: narrative.factualSummary,
+    name: narrative.topName ?? "Untitled",
+    ticker: narrative.topTicker ?? "IDEA",
+    sourceIds: narrative.sources.map((source) => source.sourceId),
+  });
 
   async function run(body: Record<string, unknown>) {
     setMessage(null);
@@ -126,13 +135,11 @@ export function CandidateDetail({ narrative: initial }: { narrative: NarrativeVi
       ) : null}
       {tab === "Visuals" ? (
         <div className="space-y-3">
-          <p className="text-sm text-muted">Flux draws a different mascot, logo, and banner for this story. The first render can take a few seconds.</p>
+          <p className="text-sm text-muted">Template concept: {brief.hook} The square logo and wide banner include {brief.name} and {brief.displayTicker}. These drawings are labeled templates until an image provider is configured. A generated sketch does not replace that lettering.</p>
           <div className="grid gap-3">
-            <GeneratedImage url={mascot?.imageUrl} fallback={mascot?.svg} alt={`${narrative.topName ?? narrative.title} mascot`} className="aspect-square w-full rounded-2xl border border-line object-cover" />
-            <div className="grid grid-cols-2 gap-3">
-              <GeneratedImage url={logo?.imageUrl} fallback={logo?.svg} alt={`${narrative.topName ?? narrative.title} logo`} className="aspect-square w-full rounded-2xl border border-line object-cover" />
-              <GeneratedImage url={banner?.imageUrl} fallback={banner?.svg} alt={`${narrative.topName ?? narrative.title} banner`} className="aspect-square w-full rounded-2xl border border-line object-cover" />
-            </div>
+            <GeneratedImage url={mascot?.imageUrl} fallback={mascot?.svg} alt={`${brief.name} mascot`} className="aspect-square w-full rounded-2xl border border-line object-cover" />
+            <GeneratedImage url={logo?.imageUrl} fallback={logo?.svg} alt={`${brief.name} logo`} className="aspect-square w-full rounded-2xl border border-line object-cover" />
+            <GeneratedImage url={banner?.imageUrl} fallback={banner?.svg} alt={`${brief.name} banner`} className="aspect-[3/1] w-full rounded-2xl border border-line object-cover" />
           </div>
           <div className="flex flex-wrap gap-2">
             <Button type="button" size="sm" onClick={() => run({ action: "palette", narrativeId: narrative.id })}>Another template palette</Button>

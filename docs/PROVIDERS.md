@@ -32,7 +32,7 @@ Official docs at https://docs.x.com/x-api/fundamentals/rate-limits returned HTTP
 
 ## OpenAI text and images
 
-The image guide at https://developers.openai.com/api/docs/guides/image-generation timed out while fetching, so no model id or size is hardcoded. Calls go to `POST /v1/chat/completions` and `POST /v1/images/generations` only when `OPENAI_API_KEY`, the model, and for images the size, are set to values your account documents. Invalid model output is rejected. Template art does not need these keys.
+The image guide at https://developers.openai.com/api/docs/guides/image-generation was not re-fetched successfully in this session, so no model id or size is hardcoded. The October 8 build note names `gpt-image-2.5-sunburst` as a candidate only. It is not the default, because this environment did not confirm that identifier, its sizes, or its transparency support. Calls go to `POST /v1/images/generations` only when `OPENAI_API_KEY`, `OPENAI_IMAGE_MODEL`, and `OPENAI_IMAGE_SIZE` are set to values the account documents. Template art does not need these keys and is labeled “Template concept.”
 
 ## Telegram
 

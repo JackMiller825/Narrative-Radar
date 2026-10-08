@@ -4,6 +4,7 @@ import { clusterItems } from "./clustering";
 import { suggestNames } from "./naming";
 import { assessStory, describeTokenNarrative } from "./narrative-fit";
 import { MARKET_PEOPLE } from "./people";
+import { buildVisualBrief } from "./visual-brief";
 import { componentValue, lifecycleFor, scoreNarrative } from "./scoring";
 import type {
   AssetRecord,
@@ -372,9 +373,18 @@ function metricsFor(narrative: NarrativeView): MetricPoint[] {
   return narrative.sources.flatMap((source) => source.metrics ?? []);
 }
 
-const TEMPLATE_VERSION = "template-v2";
+const TEMPLATE_VERSION = "template-v3";
 
 function syncTemplateAssets(narrative: NarrativeView, options: PipelineOptions): void {
+  const top = narrative.names.find((option) => option.isTop) ?? narrative.names[0];
+  narrative.visualBrief = buildVisualBrief({
+    narrativeId: narrative.id,
+    title: narrative.title,
+    summary: `${narrative.factualSummary} ${narrative.creativeIdea}`,
+    name: top?.name ?? "Untitled",
+    ticker: top?.ticker ?? "IDEA",
+    sourceIds: narrative.sources.map((source) => source.sourceId),
+  });
   const templates = narrative.assets.filter((asset) => asset.mode === "template" && asset.status === "ready");
   const current = templates.length >= 3 && templates.every((asset) => asset.svg && asset.prompt?.includes(TEMPLATE_VERSION));
   if (!current) {
@@ -388,7 +398,15 @@ function templateAssets(narrative: NarrativeView, options: PipelineOptions): Ass
   const top = narrative.names.find((option) => option.isTop) ?? narrative.names[0];
   const name = top?.name ?? "Untitled";
   const ticker = top?.ticker ?? "IDEA";
-  const motif = pickMotif(narrative.stableKey);
+  const brief = narrative.visualBrief ?? buildVisualBrief({
+    narrativeId: narrative.id,
+    title: narrative.title,
+    name,
+    ticker,
+    sourceIds: narrative.sources.map((source) => source.sourceId),
+  });
+  narrative.visualBrief = brief;
+  const motif = brief.motif;
   const palette = pickPalette(narrative.stableKey);
   const illustrationKey = illustrationCacheKey({
     narrativeId: narrative.id,
@@ -398,7 +416,7 @@ function templateAssets(narrative: NarrativeView, options: PipelineOptions): Ass
     promptVersion: TEMPLATE_VERSION,
   });
   const textKey = textLayerKey({ illustrationKey, name, ticker });
-  const art = { motif, palette, name, ticker, narrativeTitle: narrative.title };
+  const art = { motif, palette, name, ticker, narrativeTitle: narrative.title, narrativeId: narrative.id, brief };
   const logo = renderTemplateSvg("logo", art);
   const banner = renderTemplateSvg("banner", art);
   const mascot = renderTemplateSvg("mascot", art);
@@ -416,7 +434,7 @@ function templateAssets(narrative: NarrativeView, options: PipelineOptions): Ass
     error: null,
     favorite: false,
     version: 1,
-    prompt: `${TEMPLATE_VERSION}. Original mascot, logo, and banner.`,
+    prompt: `${TEMPLATE_VERSION}. Template concept. ${brief.hook}`,
     createdAt: options.now,
     mode: "template" as const,
     status: "ready" as const,
