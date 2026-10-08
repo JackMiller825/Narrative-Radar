@@ -3,15 +3,19 @@
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/input";
-import { deskAction } from "@/lib/utils";
+import { downloadNarrativePack } from "@/lib/published-desk";
+import { useLiveNarratives } from "@/lib/use-live-desk";
+import { deskAction, isPublishedSnapshot } from "@/lib/utils";
 import type { NarrativeView } from "@radar/core";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 
 const TABS = ["Overview", "Evidence", "Names", "Visuals", "Timeline"] as const;
 
-export function CandidateDetail({ narrative }: { narrative: NarrativeView }) {
+export function CandidateDetail({ narrative: initial }: { narrative: NarrativeView }) {
   const router = useRouter();
+  const rows = useLiveNarratives([initial]);
+  const narrative = rows.find((item) => item.id === initial.id) ?? initial;
   const [tab, setTab] = useState<(typeof TABS)[number]>("Overview");
   const [message, setMessage] = useState<string | null>(null);
   const [note, setNote] = useState("");
@@ -24,7 +28,7 @@ export function CandidateDetail({ narrative }: { narrative: NarrativeView }) {
       const result = await deskAction(body);
       if (typeof result.detail === "string") setMessage(result.detail);
       else if (typeof result.reason === "string") setMessage(result.reason);
-      router.refresh();
+      if (!isPublishedSnapshot()) router.refresh();
     } catch (error) {
       setMessage(error instanceof Error ? error.message : "Action failed.");
     }
@@ -61,9 +65,9 @@ export function CandidateDetail({ narrative }: { narrative: NarrativeView }) {
               className="inline-flex h-8 items-center rounded-full border border-line px-3 text-xs"
               href={`/api/export/${narrative.id}`}
               onClick={(event) => {
-                if (document.documentElement.dataset.pages !== "static") return;
+                if (!isPublishedSnapshot()) return;
                 event.preventDefault();
-                setMessage("Download packs are created by the hosted server. This GitHub Pages copy is a static demo.");
+                downloadNarrativePack(narrative);
               }}
             >
               Download pack

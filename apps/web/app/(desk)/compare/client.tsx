@@ -1,12 +1,14 @@
 "use client";
 
+import { useLiveNarratives } from "@/lib/use-live-desk";
 import type { NarrativeView } from "@radar/core";
 import { useSearchParams } from "next/navigation";
 
 export function CompareDesk({ narratives }: { narratives: NarrativeView[] }) {
   const params = useSearchParams();
+  const rows = useLiveNarratives(narratives);
   const ids = (params.get("ids") ?? "").split(",").filter(Boolean).slice(0, 4);
-  const chosen = narratives.filter((narrative) => ids.includes(narrative.id));
+  const chosen = rows.filter((narrative) => ids.includes(narrative.id));
   return (
     <div>
       <h1 className="display text-4xl">Compare</h1>

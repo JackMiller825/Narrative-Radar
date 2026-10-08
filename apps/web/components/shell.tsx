@@ -2,6 +2,7 @@
 
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { useLiveDesk } from "@/lib/use-live-desk";
 import { deskAction, formatWhen } from "@/lib/utils";
 import type { DeskData } from "@/lib/types";
 import { Bell, Bookmark, Radar, Rss, Settings, SunMedium, MoonStar, Waves } from "lucide-react";
@@ -38,19 +39,23 @@ function normalizePath(value: string) {
 export function Shell({ desk, children, initialTheme = "dark", published = false }: { desk: DeskData; children: React.ReactNode; initialTheme?: "dark" | "light"; published?: boolean }) {
   const pathname = normalizePath(usePathname());
   const router = useRouter();
+  const liveDesk = useLiveDesk(desk);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [notice, setNotice] = useState<string | null>(null);
   const theme = useSyncExternalStore(subscribeTheme, getTheme, () => initialTheme);
-  const unread = desk.alerts.filter((alert) => !alert.readAt && alert.status !== "suppressed").length;
-  const status = desk.settings.paused ? "Paused" : desk.worker.online ? "Worker live" : "Worker offline";
-  const tone = desk.settings.paused ? "text-amber-300" : desk.worker.online ? "text-mint" : "text-amber-300";
+  const unread = liveDesk.alerts.filter((alert) => !alert.readAt && alert.status !== "suppressed").length;
+  const status = liveDesk.settings.paused ? "Paused" : liveDesk.worker.online ? "Worker live" : "Worker offline";
+  const tone = liveDesk.settings.paused ? "text-amber-300" : liveDesk.worker.online ? "text-mint" : "text-amber-300";
 
   async function scan() {
     setBusy(true);
     setError(null);
+    setNotice(null);
     try {
-      await deskAction({ action: "scan" });
-      router.refresh();
+      const result = await deskAction({ action: "scan" });
+      setNotice(typeof result.reason === "string" ? result.reason : "Scan finished.");
+      if (!published) router.refresh();
     } catch (reason) {
       setError(reason instanceof Error ? reason.message : "Scan failed.");
     } finally {
@@ -63,7 +68,8 @@ export function Shell({ desk, children, initialTheme = "dark", published = false
     setError(null);
     try {
       await deskAction({ action: "settings", schedulePreset });
-      router.refresh();
+      setNotice(`Interval set to ${schedulePreset}.`);
+      if (!published) router.refresh();
     } catch (reason) {
       setError(reason instanceof Error ? reason.message : "Could not change the interval.");
     } finally {
@@ -88,7 +94,7 @@ export function Shell({ desk, children, initialTheme = "dark", published = false
           </span>
           <div>
             <p className="display text-lg leading-none">Narrative Radar</p>
-            <p className="text-xs text-muted">{desk.workspace.mode === "demo" ? "Demo mode" : "Live mode"}</p>
+            <p className="text-xs text-muted">{liveDesk.workspace.mode === "demo" ? "Demo mode" : "Live mode"}</p>
           </div>
         </div>
         <nav className="flex gap-1 overflow-x-auto px-3 pb-3 md:block md:space-y-1 md:px-3" aria-label="Primary">
@@ -111,15 +117,15 @@ export function Shell({ desk, children, initialTheme = "dark", published = false
           <form action="/radar" method="get" className="min-w-40 flex-1">
             <input name="q" aria-label="Search the desk" placeholder="Search title, name, ticker" className="h-8 w-full rounded-full border border-line bg-card px-3 text-sm" />
           </form>
-          <p className="text-xs text-muted">Next scan {formatWhen(desk.settings.nextDueAt, desk.settings.timezone)}</p>
-          <p className="text-xs text-muted">Last success {formatWhen(desk.settings.lastSuccessfulAt, desk.settings.timezone)}</p>
-          <p className="text-xs text-muted">Last attempt {formatWhen(desk.settings.lastAttemptedAt, desk.settings.timezone)}</p>
+          <p className="text-xs text-muted">Next scan {formatWhen(liveDesk.settings.nextDueAt, liveDesk.settings.timezone)}</p>
+          <p className="text-xs text-muted">Last success {formatWhen(liveDesk.settings.lastSuccessfulAt, liveDesk.settings.timezone)}</p>
+          <p className="text-xs text-muted">Last attempt {formatWhen(liveDesk.settings.lastAttemptedAt, liveDesk.settings.timezone)}</p>
           <div className="ml-auto flex items-center gap-2">
             <label className="text-xs text-muted">
               <select
                 aria-label="Scan interval"
                 className="h-8 rounded-full border border-line bg-card px-2 text-xs text-foreground"
-                value={desk.settings.schedulePreset}
+                value={liveDesk.settings.schedulePreset}
                 disabled={busy}
                 onChange={(event) => changeInterval(event.target.value)}
               >
@@ -136,11 +142,12 @@ export function Shell({ desk, children, initialTheme = "dark", published = false
             <Button type="button" size="sm" onClick={scan} disabled={busy}>{busy ? "Scanning…" : "Scan now"}</Button>
           </div>
           {error ? <p className="w-full text-sm text-red-300" role="alert">{error}</p> : null}
+          {notice ? <p className="w-full text-sm text-mint" role="status">{notice}</p> : null}
         </header>
         <div className="px-4 py-5 md:px-6">
           {published ? (
             <p className="mb-4 rounded-2xl border border-line bg-card px-4 py-3 text-sm text-muted">
-              This is the public demo on GitHub Pages. The cards are labeled fixtures. Scan, shortlist, and settings changes run only where the server and database are hosted.
+              This desk runs in your browser. Scan, shortlist, and settings are saved on this device. Demo mode rescores the fixture cards. Live mode fetches Hacker News and feeds when the browser allows it.
             </p>
           ) : null}
           {children}

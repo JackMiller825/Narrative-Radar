@@ -35,7 +35,10 @@ export function isPublishedSnapshot() {
 
 export async function deskAction(body: Record<string, unknown>) {
   if (isPublishedSnapshot()) {
-    throw new Error("This published site is a static demo. Scans, board moves, and settings run only where the web server and database are hosted.");
+    const { runPublishedAction } = await import("./published-desk");
+    const data = await runPublishedAction(body);
+    if (data.ok === false) throw new Error(data.reason || data.error || "That action did not complete.");
+    return data;
   }
   const response = await fetch("/api/desk", {
     method: "POST",

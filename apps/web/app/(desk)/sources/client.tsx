@@ -3,13 +3,15 @@
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { deskAction, formatWhen } from "@/lib/utils";
+import { useLiveDesk } from "@/lib/use-live-desk";
+import { deskAction, formatWhen, isPublishedSnapshot } from "@/lib/utils";
 import type { DeskData } from "@/lib/types";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 
 export function SourcesDesk({ desk }: { desk: DeskData }) {
   const router = useRouter();
+  const liveDesk = useLiveDesk(desk);
   const [url, setUrl] = useState("");
   const [title, setTitle] = useState("");
   const [article, setArticle] = useState("");
@@ -20,7 +22,7 @@ export function SourcesDesk({ desk }: { desk: DeskData }) {
       const result = await deskAction(body);
       setMessage(typeof result.reason === "string" ? result.reason : "Saved.");
       setPasted("");
-      router.refresh();
+      if (!isPublishedSnapshot()) router.refresh();
     } catch (error) {
       setMessage(error instanceof Error ? error.message : "Failed.");
     }
@@ -32,21 +34,21 @@ export function SourcesDesk({ desk }: { desk: DeskData }) {
         <p className="max-w-2xl text-sm text-muted">RSS, Hacker News, and DEX Screener can run without extra keys. X, OpenAI, and Telegram stay unconfigured until server credentials exist. One broken feed does not fail the scan.</p>
       </div>
       <ul className="grid gap-3 md:grid-cols-2">
-        {desk.providers.map((provider) => (
+        {liveDesk.providers.map((provider) => (
           <li key={provider.id} className="rounded-3xl border border-line bg-card p-4">
             <div className="flex items-center justify-between gap-2">
               <h2 className="font-medium">{provider.provider}</h2>
               <Badge>{provider.status}</Badge>
             </div>
             <p className="mt-2 text-sm text-muted">{provider.detail}</p>
-            <p className="mt-2 text-xs text-muted">Last success {formatWhen(provider.lastSuccessAt, desk.settings.timezone)}{provider.lastError ? ` · ${provider.lastError}` : ""}</p>
+            <p className="mt-2 text-xs text-muted">Last success {formatWhen(provider.lastSuccessAt, liveDesk.settings.timezone)}{provider.lastError ? ` · ${provider.lastError}` : ""}</p>
           </li>
         ))}
       </ul>
       <section className="rounded-3xl border border-line bg-card p-4">
         <h2 className="font-medium">Feeds</h2>
         <ul className="mt-3 space-y-2 text-sm">
-          {desk.feeds.map((feed) => (
+          {liveDesk.feeds.map((feed) => (
             <li key={feed.id} className="flex flex-wrap items-center justify-between gap-2 border-b border-line py-2">
               <div>
                 <p>{feed.title}</p>

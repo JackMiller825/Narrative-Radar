@@ -4,6 +4,7 @@ import { CandidateDetail } from "@/components/candidate-detail";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { useLiveDesk } from "@/lib/use-live-desk";
 import { ageLabel, deskAction, isPublishedSnapshot } from "@/lib/utils";
 import type { DeskData } from "@/lib/types";
 import type { NarrativeView } from "@radar/core";
@@ -13,12 +14,13 @@ import { useEffect, useMemo, useState } from "react";
 
 export function RadarApp({ desk, now, initialQuery = "" }: { desk: DeskData; now: string; initialQuery?: string }) {
   const router = useRouter();
+  const liveDesk = useLiveDesk(desk);
   const [query, setQuery] = useState(initialQuery);
   const [category, setCategory] = useState("all");
   const [lifecycle, setLifecycle] = useState("all");
   const [sort, setSort] = useState("recent");
   const [coverage, setCoverage] = useState(0);
-  const [selected, setSelected] = useState<string | null>(desk.narratives[0]?.id ?? null);
+  const [selected, setSelected] = useState<string | null>(liveDesk.narratives[0]?.id ?? null);
   const [fresh, setFresh] = useState(0);
   const [message, setMessage] = useState<string | null>(null);
   const [compare, setCompare] = useState<string[]>([]);
@@ -69,7 +71,7 @@ export function RadarApp({ desk, now, initialQuery = "" }: { desk: DeskData; now
   }, []);
 
   const rows = useMemo(() => {
-    const filtered = desk.narratives.filter((narrative) => {
+    const filtered = liveDesk.narratives.filter((narrative) => {
       const haystack = `${narrative.title} ${narrative.topName ?? ""} ${narrative.topTicker ?? ""}`.toLowerCase();
       if (query && !haystack.includes(query.toLowerCase())) return false;
       if (category !== "all" && narrative.category !== category) return false;
@@ -85,12 +87,12 @@ export function RadarApp({ desk, now, initialQuery = "" }: { desk: DeskData; now
       return b.latestMeaningfulAt.localeCompare(a.latestMeaningfulAt);
     });
     return copy;
-  }, [desk.narratives, query, category, lifecycle, sort, coverage]);
+  }, [liveDesk.narratives, query, category, lifecycle, sort, coverage]);
 
   const active = rows.find((row) => row.id === selected) ?? rows[0] ?? null;
-  const stale = desk.settings.lastSuccessfulAt
-    ? new Date(now).getTime() - new Date(desk.settings.lastSuccessfulAt).getTime() > desk.schedule.seconds * 2 * 1000
-    : desk.scans.length === 0;
+  const stale = liveDesk.settings.lastSuccessfulAt
+    ? new Date(now).getTime() - new Date(liveDesk.settings.lastSuccessfulAt).getTime() > liveDesk.schedule.seconds * 2 * 1000
+    : liveDesk.scans.length === 0;
 
   return (
     <div className="space-y-4">
@@ -99,12 +101,12 @@ export function RadarApp({ desk, now, initialQuery = "" }: { desk: DeskData; now
           <h1 className="display text-4xl">Live Radar</h1>
           <p className="max-w-2xl text-sm text-muted">Ranked narrative candidates from the sources this desk actually checks. A green worker light means the background process is up, not that every provider is healthy.</p>
         </div>
-        {desk.workspace.mode === "demo" ? (
-          <Button type="button" variant="outline" onClick={() => deskAction({ action: "replay" }).then(() => router.refresh()).catch((error) => setMessage(error.message))}>Introduce lighthouse cat fixture</Button>
+        {liveDesk.workspace.mode === "demo" ? (
+          <Button type="button" variant="outline" onClick={() => deskAction({ action: "replay" }).then((result) => { setMessage(typeof result.reason === "string" ? result.reason : "Fixture added."); if (!isPublishedSnapshot()) router.refresh(); }).catch((error) => setMessage(error.message))}>Introduce lighthouse cat fixture</Button>
         ) : null}
       </div>
-      {!desk.worker.online ? <Banner tone="warn">The worker looks offline. Scheduled scans wait until the worker process is running. Scan now still uses this web process.</Banner> : null}
-      {desk.workspace.mode === "demo" ? <Banner>Demo mode is on. Cards below come from labeled fixtures. External alerts and paid image calls stay off.</Banner> : null}
+      {!liveDesk.worker.online ? <Banner tone="warn">The worker looks offline. Scheduled scans wait until the worker process is running. Scan now still uses this web process.</Banner> : null}
+      {liveDesk.workspace.mode === "demo" ? <Banner>Demo mode is on. Cards below come from labeled fixtures. External alerts and paid image calls stay off.</Banner> : null}
       {stale ? <Banner tone="warn">Scan data is stale or this desk has not completed a scan yet. Last success stays put when an attempt fails.</Banner> : null}
       {fresh > 0 ? (
         <button type="button" className="w-full rounded-2xl border border-mint/40 bg-card px-4 py-3 text-left text-sm" onClick={() => { setFresh(0); router.refresh(); }}>
@@ -115,7 +117,7 @@ export function RadarApp({ desk, now, initialQuery = "" }: { desk: DeskData; now
         <Input aria-label="Search candidates" placeholder="Search title, name, ticker" value={query} onChange={(event) => setQuery(event.target.value)} />
         <select aria-label="Category" className="h-10 w-full min-w-0 rounded-xl border border-line bg-card px-3" value={category} onChange={(event) => setCategory(event.target.value)}>
           <option value="all">All categories</option>
-          {desk.settings.categories.map((item) => <option key={item}>{item}</option>)}
+          {liveDesk.settings.categories.map((item) => <option key={item}>{item}</option>)}
         </select>
         <select aria-label="Lifecycle" className="h-10 w-full min-w-0 rounded-xl border border-line bg-card px-3" value={lifecycle} onChange={(event) => setLifecycle(event.target.value)}>
           <option value="all">All lifecycles</option>
@@ -162,7 +164,7 @@ export function RadarApp({ desk, now, initialQuery = "" }: { desk: DeskData; now
           </aside>
         </div>
       )}
-      <p className="text-xs text-muted">{desk.schedule.preview.note}</p>
+      <p className="text-xs text-muted">{liveDesk.schedule.preview.note}</p>
     </div>
   );
 }

@@ -1,5 +1,3 @@
-import { createHash } from "node:crypto";
-
 const STOP = new Set([
   "the", "a", "an", "of", "and", "or", "to", "in", "on", "for", "with", "from", "by",
   "at", "as", "is", "are", "was", "were", "be", "this", "that", "it", "its", "new",
@@ -10,7 +8,63 @@ const STOP = new Set([
 ]);
 
 export function sha1(value: string): string {
-  return createHash("sha1").update(value).digest("hex");
+  const bytes = new TextEncoder().encode(value);
+  const words: number[] = [];
+  for (let i = 0; i < bytes.length; i += 1) {
+    words[i >> 2] = (words[i >> 2] ?? 0) | (bytes[i]! << (24 - (i % 4) * 8));
+  }
+  const bitLength = bytes.length * 8;
+  words[bitLength >> 5] = (words[bitLength >> 5] ?? 0) | (0x80 << (24 - (bitLength % 32)));
+  words[(((bitLength + 64) >> 9) << 4) + 15] = bitLength;
+
+  let h0 = 0x67452301;
+  let h1 = 0xefcdab89;
+  let h2 = 0x98badcfe;
+  let h3 = 0x10325476;
+  let h4 = 0xc3d2e1f0;
+  const w = new Array<number>(80);
+
+  for (let i = 0; i < words.length; i += 16) {
+    for (let j = 0; j < 16; j += 1) w[j] = words[i + j] ?? 0;
+    for (let j = 16; j < 80; j += 1) {
+      const n = (w[j - 3]! ^ w[j - 8]! ^ w[j - 14]! ^ w[j - 16]!) | 0;
+      w[j] = (n << 1) | (n >>> 31);
+    }
+    let a = h0;
+    let b = h1;
+    let c = h2;
+    let d = h3;
+    let e = h4;
+    for (let j = 0; j < 80; j += 1) {
+      let f = 0;
+      let k = 0;
+      if (j < 20) {
+        f = (b & c) | (~b & d);
+        k = 0x5a827999;
+      } else if (j < 40) {
+        f = b ^ c ^ d;
+        k = 0x6ed9eba1;
+      } else if (j < 60) {
+        f = (b & c) | (b & d) | (c & d);
+        k = 0x8f1bbcdc;
+      } else {
+        f = b ^ c ^ d;
+        k = 0xca62c1d6;
+      }
+      const temp = ((((a << 5) | (a >>> 27)) + f + e + k + (w[j] ?? 0)) | 0);
+      e = d;
+      d = c;
+      c = (b << 30) | (b >>> 2);
+      b = a;
+      a = temp;
+    }
+    h0 = (h0 + a) | 0;
+    h1 = (h1 + b) | 0;
+    h2 = (h2 + c) | 0;
+    h3 = (h3 + d) | 0;
+    h4 = (h4 + e) | 0;
+  }
+  return [h0, h1, h2, h3, h4].map((part) => (part >>> 0).toString(16).padStart(8, "0")).join("");
 }
 
 export function shortHash(value: string, length = 12): string {

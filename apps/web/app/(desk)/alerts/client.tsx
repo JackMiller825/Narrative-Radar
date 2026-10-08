@@ -2,20 +2,22 @@
 
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { deskAction, formatWhen } from "@/lib/utils";
+import { useLiveDesk } from "@/lib/use-live-desk";
+import { deskAction, formatWhen, isPublishedSnapshot } from "@/lib/utils";
 import type { DeskData } from "@/lib/types";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 
 export function AlertsDesk({ desk }: { desk: DeskData }) {
   const router = useRouter();
+  const liveDesk = useLiveDesk(desk);
   const [message, setMessage] = useState<string | null>(null);
   const [soundOn, setSoundOn] = useState(false);
   async function act(body: Record<string, unknown>) {
     try {
       const result = await deskAction(body);
       setMessage(result.instructions || result.reason || "Saved.");
-      router.refresh();
+      if (!isPublishedSnapshot()) router.refresh();
     } catch (error) {
       setMessage(error instanceof Error ? error.message : "Failed.");
     }
@@ -50,17 +52,17 @@ export function AlertsDesk({ desk }: { desk: DeskData }) {
         <Button type="button" variant="outline" onClick={() => act({ action: "telegram-check" })}>Check pairing</Button>
         <Button type="button" variant="outline" onClick={() => act({ action: "telegram-test" })}>Send test alert</Button>
       </div>
-      <p className="text-sm text-muted">Telegram bot {desk.telegram.configured ? "token is set on the server" : "is not configured"}. Chat {desk.telegram.paired ? `paired${desk.telegram.username ? ` as @${desk.telegram.username}` : ""}` : "not paired"}.</p>
-      {desk.telegram.pairingCode ? <p className="rounded-2xl bg-card p-3 text-sm">Send <code>/start {desk.telegram.pairingCode}</code> to your bot, then check pairing.</p> : null}
+      <p className="text-sm text-muted">Telegram bot {liveDesk.telegram.configured ? "token is set on the server" : "is not configured"}. Chat {liveDesk.telegram.paired ? `paired${liveDesk.telegram.username ? ` as @${liveDesk.telegram.username}` : ""}` : "not paired"}.</p>
+      {liveDesk.telegram.pairingCode ? <p className="rounded-2xl bg-card p-3 text-sm">Send <code>/start {liveDesk.telegram.pairingCode}</code> to your bot, then check pairing.</p> : null}
       {message ? <p className="text-sm text-mint" role="status">{message}</p> : null}
       <ul className="space-y-3">
-        {desk.alerts.length === 0 ? <li className="rounded-3xl border border-dashed border-line p-6 text-sm text-muted">The inbox is empty.</li> : null}
-        {desk.alerts.map((alert) => (
+        {liveDesk.alerts.length === 0 ? <li className="rounded-3xl border border-dashed border-line p-6 text-sm text-muted">The inbox is empty.</li> : null}
+        {liveDesk.alerts.map((alert) => (
           <li key={alert.id} className="rounded-3xl border border-line bg-card p-4">
             <div className="flex flex-wrap gap-2">
               <Badge>{alert.status}</Badge>
               <Badge>{alert.eventType}</Badge>
-              <span className="text-xs text-muted">{formatWhen(alert.createdAt, desk.settings.timezone)}</span>
+              <span className="text-xs text-muted">{formatWhen(alert.createdAt, liveDesk.settings.timezone)}</span>
             </div>
             <h2 className="mt-2 font-medium">{alert.title}</h2>
             <pre className="mt-2 whitespace-pre-wrap font-sans text-sm text-muted">{alert.body}</pre>

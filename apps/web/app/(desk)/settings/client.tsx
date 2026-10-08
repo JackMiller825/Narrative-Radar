@@ -2,25 +2,27 @@
 
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { deskAction } from "@/lib/utils";
+import { useLiveDesk } from "@/lib/use-live-desk";
+import { deskAction, isPublishedSnapshot } from "@/lib/utils";
 import type { DeskData } from "@/lib/types";
 import { useRouter } from "next/navigation";
 import { useState, type FormEvent } from "react";
 
 export function SettingsForm({ desk }: { desk: DeskData }) {
   const router = useRouter();
+  const liveDesk = useLiveDesk(desk);
   const [message, setMessage] = useState<string | null>(null);
-  const [preset, setPreset] = useState(desk.settings.schedulePreset);
-  const [custom, setCustom] = useState(desk.settings.customIntervalSeconds);
-  const [paused, setPaused] = useState(desk.settings.paused);
-  const [mode, setMode] = useState(desk.workspace.mode);
-  const [chain, setChain] = useState(desk.settings.chainPreference);
-  const [timezone, setTimezone] = useState(desk.settings.timezone);
-  const [style, setStyle] = useState(desk.settings.namingStyle);
-  const [keywords, setKeywords] = useState(desk.settings.excludedKeywords.join(", "));
-  const [watched, setWatched] = useState(desk.settings.watchedEntities.join(", "));
-  const [retention, setRetention] = useState(desk.settings.retentionDays);
-  const [limit, setLimit] = useState(desk.settings.dailyRequestLimit);
+  const [preset, setPreset] = useState(liveDesk.settings.schedulePreset);
+  const [custom, setCustom] = useState(liveDesk.settings.customIntervalSeconds);
+  const [paused, setPaused] = useState(liveDesk.settings.paused);
+  const [mode, setMode] = useState(liveDesk.workspace.mode);
+  const [chain, setChain] = useState(liveDesk.settings.chainPreference);
+  const [timezone, setTimezone] = useState(liveDesk.settings.timezone);
+  const [style, setStyle] = useState(liveDesk.settings.namingStyle);
+  const [keywords, setKeywords] = useState(liveDesk.settings.excludedKeywords.join(", "));
+  const [watched, setWatched] = useState(liveDesk.settings.watchedEntities.join(", "));
+  const [retention, setRetention] = useState(liveDesk.settings.retentionDays);
+  const [limit, setLimit] = useState(liveDesk.settings.dailyRequestLimit);
 
   async function save(event: FormEvent) {
     event.preventDefault();
@@ -40,7 +42,7 @@ export function SettingsForm({ desk }: { desk: DeskData }) {
         dailyRequestLimit: Number(limit),
       });
       setMessage("Settings saved.");
-      router.refresh();
+      if (!isPublishedSnapshot()) router.refresh();
     } catch (error) {
       setMessage(error instanceof Error ? error.message : "Could not save.");
     }
@@ -73,7 +75,7 @@ export function SettingsForm({ desk }: { desk: DeskData }) {
           <Input className="mt-1" type="number" min={60} max={86400} value={custom} onChange={(event) => setCustom(Number(event.target.value))} />
         </label>
       ) : null}
-      <p className="text-sm text-muted">{desk.schedule.preview.note} About {desk.schedule.preview.checksPerDay} checks a day at the current interval.</p>
+      <p className="text-sm text-muted">{liveDesk.schedule.preview.note} About {liveDesk.schedule.preview.checksPerDay} checks a day at the current interval.</p>
       <label className="flex items-center gap-2 text-sm"><input type="checkbox" checked={paused} onChange={(event) => setPaused(event.target.checked)} /> Pause new scans</label>
       <label className="block text-sm">Timezone
         <Input className="mt-1" value={timezone} onChange={(event) => setTimezone(event.target.value)} />
@@ -95,7 +97,7 @@ export function SettingsForm({ desk }: { desk: DeskData }) {
       <label className="block text-sm">Retention days
         <Input className="mt-1" type="number" value={retention} onChange={(event) => setRetention(Number(event.target.value))} />
       </label>
-      <p className="text-sm text-muted">{desk.settings.priceAssumptions?.note ?? "Dollar figures are assumptions, not invoices."} Text budget {desk.settings.textBudgetUsd ?? "not set"}. Image budget {desk.settings.imageBudgetUsd ?? "not set"}.</p>
+      <p className="text-sm text-muted">{liveDesk.settings.priceAssumptions?.note ?? "Dollar figures are assumptions, not invoices."} Text budget {liveDesk.settings.textBudgetUsd ?? "not set"}. Image budget {liveDesk.settings.imageBudgetUsd ?? "not set"}.</p>
       <div className="flex flex-wrap gap-2">
         <Button type="submit">Save settings</Button>
         <Button type="button" variant="outline" onClick={() => deskAction({ action: "retention" }).then((result) => setMessage(`Removed ${String((result as { removed?: number }).removed ?? 0)} old unsaved candidates.`)).catch((error) => setMessage(error.message))}>Apply retention now</Button>
@@ -104,8 +106,8 @@ export function SettingsForm({ desk }: { desk: DeskData }) {
       <section>
         <h2 className="font-medium">Recent scans</h2>
         <ul className="mt-2 space-y-1 text-sm text-muted">
-          {desk.scans.length === 0 ? <li>No scans yet.</li> : null}
-          {desk.scans.map((scan) => <li key={scan.id}>{scan.trigger} · {scan.status}{scan.error ? ` · ${scan.error}` : ""}</li>)}
+          {liveDesk.scans.length === 0 ? <li>No scans yet.</li> : null}
+          {liveDesk.scans.map((scan) => <li key={scan.id}>{scan.trigger} · {scan.status}{scan.error ? ` · ${scan.error}` : ""}</li>)}
         </ul>
       </section>
     </form>
