@@ -1,11 +1,15 @@
-import { ensureWorkspace, loadDesk } from "@radar/db";
-
 export async function requireUser() {
+  const { ensureWorkspace } = await import("@radar/db");
   const { user, workspace } = await ensureWorkspace();
   return { userId: user.id, workspaceId: workspace.id };
 }
 
 export async function requireDesk() {
+  if (process.env.GITHUB_PAGES === "1") {
+    const { staticDesk } = await import("./static-desk");
+    return staticDesk();
+  }
+  const { loadDesk } = await import("@radar/db");
   const user = await requireUser();
   const desk = await loadDesk(user.userId);
   return JSON.parse(JSON.stringify(desk)) as Awaited<ReturnType<typeof loadDesk>> & {

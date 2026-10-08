@@ -4,7 +4,7 @@ import { CandidateDetail } from "@/components/candidate-detail";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { ageLabel, deskAction } from "@/lib/utils";
+import { ageLabel, deskAction, isPublishedSnapshot } from "@/lib/utils";
 import type { DeskData } from "@/lib/types";
 import type { NarrativeView } from "@radar/core";
 import Link from "next/link";
@@ -24,6 +24,13 @@ export function RadarApp({ desk, now, initialQuery = "" }: { desk: DeskData; now
   const [compare, setCompare] = useState<string[]>([]);
 
   useEffect(() => {
+    if (initialQuery) return;
+    const q = new URLSearchParams(window.location.search).get("q");
+    if (q) setQuery(q);
+  }, [initialQuery]);
+
+  useEffect(() => {
+    if (isPublishedSnapshot()) return;
     let cancelled = false;
     let source: EventSource | null = null;
     let poll: number | null = null;

@@ -29,7 +29,14 @@ export function ageLabel(value: string | null | undefined) {
   return `${Math.round(hours / 24)}d ago`;
 }
 
+export function isPublishedSnapshot() {
+  return typeof document !== "undefined" && document.documentElement.dataset.pages === "static";
+}
+
 export async function deskAction(body: Record<string, unknown>) {
+  if (isPublishedSnapshot()) {
+    throw new Error("This published site is a static demo. Scans, board moves, and settings run only where the web server and database are hosted.");
+  }
   const response = await fetch("/api/desk", {
     method: "POST",
     headers: { "content-type": "application/json" },

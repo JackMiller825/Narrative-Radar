@@ -30,8 +30,13 @@ const LINKS = [
   { href: "/saturation", label: "Saturation", icon: Waves },
 ];
 
-export function Shell({ desk, children, initialTheme = "dark" }: { desk: DeskData; children: React.ReactNode; initialTheme?: "dark" | "light" }) {
-  const pathname = usePathname();
+function normalizePath(value: string) {
+  if (value.length > 1 && value.endsWith("/")) return value.slice(0, -1);
+  return value;
+}
+
+export function Shell({ desk, children, initialTheme = "dark", published = false }: { desk: DeskData; children: React.ReactNode; initialTheme?: "dark" | "light"; published?: boolean }) {
+  const pathname = normalizePath(usePathname());
   const router = useRouter();
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -132,7 +137,14 @@ export function Shell({ desk, children, initialTheme = "dark" }: { desk: DeskDat
           </div>
           {error ? <p className="w-full text-sm text-red-300" role="alert">{error}</p> : null}
         </header>
-        <div className="px-4 py-5 md:px-6">{children}</div>
+        <div className="px-4 py-5 md:px-6">
+          {published ? (
+            <p className="mb-4 rounded-2xl border border-line bg-card px-4 py-3 text-sm text-muted">
+              This is the public demo on GitHub Pages. The cards are labeled fixtures. Scan, shortlist, and settings changes run only where the server and database are hosted.
+            </p>
+          ) : null}
+          {children}
+        </div>
       </div>
     </div>
   );

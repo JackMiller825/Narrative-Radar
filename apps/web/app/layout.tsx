@@ -1,6 +1,6 @@
+import { readInitialTheme } from "@/lib/theme";
 import type { Metadata } from "next";
 import { Fraunces, Outfit } from "next/font/google";
-import { cookies } from "next/headers";
 import "./globals.css";
 
 const outfit = Outfit({ subsets: ["latin"], variable: "--font-outfit" });
@@ -13,10 +13,11 @@ export const metadata: Metadata = {
 };
 
 export default async function RootLayout({ children }: { children: React.ReactNode }) {
-  const theme = (await cookies()).get("radar-theme")?.value === "light" ? "light" : "dark";
+  const theme = await readInitialTheme();
   const className = [theme === "dark" ? "dark" : "", outfit.variable, fraunces.variable].filter(Boolean).join(" ");
+  const published = process.env.GITHUB_PAGES === "1";
   return (
-    <html lang="en" className={className}>
+    <html lang="en" className={className} data-pages={published ? "static" : undefined}>
       <body>{children}</body>
     </html>
   );

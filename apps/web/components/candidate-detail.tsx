@@ -57,7 +57,17 @@ export function CandidateDetail({ narrative }: { narrative: NarrativeView }) {
           <div className="flex flex-wrap gap-2">
             <Button type="button" size="sm" onClick={() => run({ action: "board", narrativeId: narrative.id, board: "shortlisted" })}>Shortlist</Button>
             <Button type="button" size="sm" variant="outline" onClick={() => run({ action: "board", narrativeId: narrative.id, board: "dismissed" })}>Dismiss</Button>
-            <a className="inline-flex h-8 items-center rounded-full border border-line px-3 text-xs" href={`/api/export/${narrative.id}`}>Download pack</a>
+            <a
+              className="inline-flex h-8 items-center rounded-full border border-line px-3 text-xs"
+              href={`/api/export/${narrative.id}`}
+              onClick={(event) => {
+                if (document.documentElement.dataset.pages !== "static") return;
+                event.preventDefault();
+                setMessage("Download packs are created by the hosted server. This GitHub Pages copy is a static demo.");
+              }}
+            >
+              Download pack
+            </a>
           </div>
           {(["useful", "too_generic", "already_crowded", "too_old", "irrelevant"] as const).map((kind) => (
             <Button key={kind} type="button" variant="ghost" size="sm" onClick={() => run({ action: "feedback", narrativeId: narrative.id, kind })}>{kind.replaceAll("_", " ")}</Button>

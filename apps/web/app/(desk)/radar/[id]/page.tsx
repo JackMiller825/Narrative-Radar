@@ -1,7 +1,15 @@
 import { CandidateDetail } from "@/components/candidate-detail";
 import { requireDesk } from "@/lib/guard";
+import { staticNarrativeIds } from "@/lib/static-desk";
 import type { DeskData } from "@/lib/types";
 import { notFound } from "next/navigation";
+
+export function generateStaticParams() {
+  if (process.env.GITHUB_PAGES !== "1") return [];
+  return staticNarrativeIds().map((id) => ({ id }));
+}
+
+export const dynamicParams = true;
 
 export default async function NarrativePage({ params }: { params: Promise<{ id: string }> }) {
   const desk = await requireDesk();
