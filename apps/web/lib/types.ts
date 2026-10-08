@@ -24,6 +24,7 @@ export interface DeskData {
     alertSound: boolean;
     browserNotifications: boolean;
     autoScan?: boolean;
+    reportedNarratives?: { id: string; score: number; publishedAt: string | null; baseline?: boolean }[];
     nextDueAt: string | null;
     lastAttemptedAt: string | null;
     lastSuccessfulAt: string | null;

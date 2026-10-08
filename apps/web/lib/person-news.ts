@@ -1,4 +1,4 @@
-import { contentHash, excerpt, mentionedPeople, resolveWatchedPeople, stripTags, type MarketPerson, type NormalizedItem } from "@radar/core/browser";
+import { assessStory, contentHash, excerpt, laneEntities, resolveWatchedPeople, stripTags, type MarketPerson, type NormalizedItem } from "@radar/core/browser";
 
 const LOOKBACK_MS = 12 * 60 * 60 * 1000;
 export const NOTIFY_WINDOW_MS = 3 * 60 * 60 * 1000;
@@ -38,11 +38,13 @@ export async function fetchPersonStories(watched: string[], now: string): Promis
 }
 
 function newsQueries(people: MarketPerson[]): string[] {
-  const names = people.map((person) => person.name.replaceAll(" ", "+"));
-  const queries: string[] = [];
-  for (let index = 0; index < names.length; index += 3) {
-    queries.push(`${names.slice(index, index + 3).join("+OR+")}+when:1d`);
-  }
+  const queries = [
+    "Ethereum+memecoin+OR+meme+coin+OR+mascot+token+when:1d",
+    "Ethereum+AI+OR+humanoid+robot+crypto+when:1d",
+    "Polymarket+OR+prediction+market+Ethereum+OR+crypto+when:1d",
+  ];
+  const names = people.slice(0, 3).map((person) => person.name.replaceAll(" ", "+"));
+  if (names.length > 0) queries.push(`${names.join("+OR+")}+Ethereum+OR+crypto+when:1d`);
   return queries;
 }
 
@@ -63,6 +65,7 @@ async function googleFeed(query: string, people: MarketPerson[], now: string, cu
 async function hackerNews(people: MarketPerson[], now: string, cutoff: number): Promise<{ items: NormalizedItem[]; failed: boolean; source: string }> {
   try {
     const url = new URL("https://hn.algolia.com/api/v1/search_by_date");
+    url.searchParams.set("query", "ethereum OR memecoin OR polymarket OR robot OR superintelligence");
     url.searchParams.set("tags", "story");
     url.searchParams.set("hitsPerPage", "40");
     url.searchParams.set("numericFilters", `created_at_i>${Math.floor(cutoff / 1000)}`);
@@ -89,31 +92,30 @@ export async function enableDesktopAlerts(): Promise<boolean> {
   return permission === "granted";
 }
 
-export function notifyHeadlines(items: NormalizedItem[]) {
-  if (typeof window === "undefined" || items.length === 0) return;
-  const shown = items.slice(0, 3);
-  document.title = `(${items.length}) Narrative Radar`;
+export type NarrativeAlert = {
+  name: string;
+  ticker: string;
+  whyNow: string;
+  trigger: string;
+  concept: string;
+  url: string;
+};
+
+export function notifyNarrative(alert: NarrativeAlert) {
+  if (typeof window === "undefined") return;
+  document.title = `(1) Narrative Radar`;
+  const body = `${alert.whyNow} Trigger: ${alert.trigger} Concept: ${alert.concept}`;
   if (typeof Notification !== "undefined" && Notification.permission === "granted") {
-    for (const item of shown) {
-      const person = item.entities[0] ?? "Market mover";
-      const notice = new Notification(`${person} is in the news`, {
-        body: item.title,
-        tag: item.providerItemId,
-        icon: "/icon.svg",
-      });
-      notice.onclick = () => {
-        window.focus();
-        window.open(item.canonicalUrl, "_blank", "noopener");
-        notice.close();
-      };
-    }
-    if (items.length > shown.length) {
-      new Notification("Narrative Radar", {
-        body: `${items.length} new headlines about watched people.`,
-        tag: "radar-batch",
-        icon: "/icon.svg",
-      });
-    }
+    const notice = new Notification(`${alert.name} (${alert.ticker})`, {
+      body,
+      tag: alert.url || alert.ticker,
+      icon: "/icon.svg",
+    });
+    notice.onclick = () => {
+      window.focus();
+      if (alert.url) window.open(alert.url, "_blank", "noopener");
+      notice.close();
+    };
   }
   beep();
 }
@@ -121,7 +123,7 @@ export function notifyHeadlines(items: NormalizedItem[]) {
 export function notifyEnabled() {
   if (typeof Notification === "undefined" || Notification.permission !== "granted") return;
   new Notification("Narrative Radar alerts are on", {
-    body: "New headlines about Vitalik, Elon, and the other watched people will ping you while this tab stays open, even if you are in another app.",
+    body: "Auto mode pings only when a new Ethereum-friendly token narrative is materially stronger or newer than ones already reported. It stays quiet otherwise. Keep this tab open.",
     tag: "radar-enabled",
     icon: "/icon.svg",
   });
@@ -133,8 +135,9 @@ function fromRss(item: RssItem, people: MarketPerson[], now: string, cutoff: num
   if (!publishedAt || new Date(publishedAt).getTime() < cutoff) return [];
   const { headline, publisher } = splitTitle(item.title);
   const body = stripTags(item.description ?? "");
-  const entities = entitiesFor(`${headline} ${body}`, people);
-  if (entities.length === 0) return [];
+  const fit = assessStory(`${headline} ${body}`, people);
+  if (!fit.major) return [];
+  const entities = laneEntities(fit.lanes);
   return [{
     provider: "rss",
     providerItemId: `gn-${contentHash(item.link, headline)}`,
@@ -148,7 +151,7 @@ function fromRss(item: RssItem, people: MarketPerson[], now: string, cutoff: num
     fetchedAt: now,
     contentHash: contentHash(headline, body || headline),
     entities,
-    provenance: { live: true, wire: "google-news" },
+    provenance: { live: true, wire: "google-news", lanes: fit.lanes, people: fit.people },
   }];
 }
 
@@ -157,8 +160,9 @@ function fromHn(hit: AlgoliaHit, people: MarketPerson[], now: string, cutoff: nu
   const publishedAt = hit.created_at && !Number.isNaN(Date.parse(hit.created_at)) ? new Date(hit.created_at).toISOString() : null;
   if (!publishedAt || new Date(publishedAt).getTime() < cutoff) return [];
   const body = stripTags(hit.story_text ?? "");
-  const entities = entitiesFor(`${hit.title} ${body}`, people);
-  if (entities.length === 0) return [];
+  const fit = assessStory(`${hit.title} ${body}`, people);
+  if (!fit.major) return [];
+  const entities = laneEntities(fit.lanes);
   return [{
     provider: "hackernews",
     providerItemId: `hn-${hit.objectID}`,
@@ -172,13 +176,9 @@ function fromHn(hit: AlgoliaHit, people: MarketPerson[], now: string, cutoff: nu
     fetchedAt: now,
     contentHash: contentHash(hit.title, body || hit.title),
     entities,
-    provenance: { live: true },
+    provenance: { live: true, lanes: fit.lanes, people: fit.people },
     discussionUrl: `https://news.ycombinator.com/item?id=${hit.objectID}`,
   }];
-}
-
-function entitiesFor(text: string, people: MarketPerson[]): string[] {
-  return mentionedPeople(text, people);
 }
 
 function splitTitle(title: string): { headline: string; publisher: string } {

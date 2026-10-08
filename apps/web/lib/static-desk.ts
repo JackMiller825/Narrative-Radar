@@ -60,7 +60,7 @@ export function staticDesk(): DeskData {
       freshnessHours: 72,
       excludedKeywords: [],
       watchedEntities: marketPeopleNames(),
-      categories: ["ethereum", "technology", "culture", "general"],
+      categories: ["ethereum", "technology", "culture", "general", "meme", "ai", "robotics", "prediction"],
       languages: ["en"],
       scoreWeights: { ...DEFAULT_WEIGHTS },
       dailyRequestLimit: 2000,

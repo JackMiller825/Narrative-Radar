@@ -15,3 +15,4 @@ export * from "./export";
 export * from "./pipeline";
 export * from "./demo";
 export * from "./people";
+export * from "./narrative-fit";

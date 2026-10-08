@@ -2,6 +2,8 @@ import { evaluateAlerts, type AlertRuleInput, type AlertSubject } from "./alerts
 import { assertTemplateSvg, illustrationCacheKey, pickMotif, pickPalette, renderTemplateSvg, textLayerKey } from "./assets";
 import { clusterItems } from "./clustering";
 import { suggestNames } from "./naming";
+import { assessStory, describeTokenNarrative } from "./narrative-fit";
+import { MARKET_PEOPLE } from "./people";
 import { componentValue, lifecycleFor, scoreNarrative } from "./scoring";
 import type {
   AssetRecord,
@@ -328,15 +330,29 @@ function refreshNarrative(narrative: NarrativeView, all: NarrativeView[], option
   narrative.factualSummary = factualLead
     ? `${factualLead.publisher} reported “${factualLead.title}.” ${narrative.independentSources} independent origin${narrative.independentSources === 1 ? "" : "s"} and ${narrative.sources.length - narrative.independentSources} syndicated cop${narrative.sources.length - narrative.independentSources === 1 ? "y" : "ies"} are in the monitored set.`
     : "No source text is attached.";
-  narrative.whyNow = narrative.latestPublishedAt
-    ? `The latest known publication time is ${narrative.latestPublishedAt}.`
-    : "Publication time is unknown, so recency is not assumed from the time we fetched it.";
   const top = narrative.names.find((option) => option.isTop) ?? narrative.names[0];
-  narrative.creativeIdea = top
-    ? `Creative idea, not a factual claim: ${top.story}`
-    : "No creative name has been suggested yet.";
+  const fit = assessStory(text, MARKET_PEOPLE);
+  if (fit.major && top) {
+    const brief = describeTokenNarrative({
+      title: narrative.title,
+      name: top.name,
+      ticker: top.ticker,
+      publishedAt: narrative.latestPublishedAt,
+      fit,
+    });
+    narrative.whyNow = brief.whyNow;
+    narrative.creativeIdea = brief.concept;
+    narrative.category = brief.category;
+  } else {
+    narrative.whyNow = narrative.latestPublishedAt
+      ? `The latest known publication time is ${narrative.latestPublishedAt}.`
+      : "Publication time is unknown, so recency is not assumed from the time we fetched it.";
+    narrative.creativeIdea = top
+      ? `Creative idea, not a factual claim: ${top.story}`
+      : "No creative name has been suggested yet.";
+    narrative.category = categoryFor(text, narrative.entities);
+  }
   syncTemplateAssets(narrative, options);
-  narrative.category = categoryFor(text, narrative.entities);
   const changes: string[] = [];
   if (previousLife !== narrative.lifecycle) {
     changes.push(`Lifecycle moved from ${previousLife} to ${narrative.lifecycle}.`);

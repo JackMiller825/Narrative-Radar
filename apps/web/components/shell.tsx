@@ -180,7 +180,7 @@ export function Shell({ desk, children, initialTheme = "dark", published = false
         <div className="px-4 py-5 md:px-6">
           {published ? (
             <p className="mb-4 rounded-2xl border border-line bg-card px-4 py-3 text-sm text-muted">
-              This desk runs in your browser. Headlines are about famous people who can move Ethereum, such as Vitalik Buterin, Elon Musk, Donald Trump, and Jerome Powell. Manual mode checks when you press Scan now. Start repeats that check on your interval and notifies you when a new headline appears. Keep this tab open.
+              This desk runs in your browser. It watches meme trends, AI and superintelligence, Ethereum ecosystem news, famous-person-adjacent developments, robotics, and prediction markets for a major new Ethereum-friendly token narrative with a clear visual mascot. Scan now checks once. Start repeats that check and notifies you only when a narrative is materially stronger or newer than ones already reported. If nothing clears that bar, it stays quiet. A name in a headline is not treated as an endorsement. Keep this tab open.
             </p>
           ) : null}
           {children}

@@ -2,13 +2,16 @@ import {
   applyCollision,
   applyIncoming,
   assertCustomInterval,
+  assessStory,
   buildResearchPack,
   contentHash,
   defaultNewCandidateRule,
+  describeTokenNarrative,
   excerpt,
   illustrationCacheKey,
   intervalSeconds,
   marketPeopleNames,
+  materialReports,
   nextDue,
   normalizeWeights,
   pickMotif,
@@ -27,11 +30,12 @@ import {
   type NormalizedItem,
   type PipelineAlert,
   type PipelineOptions,
+  type ReportedNarrative,
   type SchedulePreset,
 } from "@radar/core/browser";
 import type { DeskData } from "./types";
 import { attachMascotImages, focusedWatchList, mascotImageUrl } from "./mascot-images";
-import { fetchPersonStories, notifyHeadlines } from "./person-news";
+import { fetchPersonStories, notifyNarrative } from "./person-news";
 
 const STORAGE_KEY = "narrative-radar-desk-v1";
 
@@ -130,8 +134,8 @@ function touchWorker(desk: DeskData, now: string) {
     online: true,
     beatAt: now,
     note: auto
-      ? `Auto mode checks every ${desk.schedule?.seconds ?? 300}s and notifies when a new headline appears.`
-      : "Manual mode. Scan now fetches the latest headlines. Press Start for automatic checks.",
+      ? "Auto mode checks on your interval and notifies only when a token narrative is materially stronger or newer. It stays quiet otherwise."
+      : "Manual mode. Scan now looks for a major new token narrative. Press Start for automatic checks.",
   };
 }
 
@@ -276,17 +280,15 @@ async function pullPersonHeadlines(now: string, announce: boolean): Promise<{ in
       draft.desk,
       "rss",
       reachable ? "healthy" : "error",
-      result.google > 0
-        ? `Google News returned ${result.google} headline${result.google === 1 ? "" : "s"} from the last 12 hours.`
-        : reachable
-          ? "Hacker News responded. Google News did not return a feed this time."
-          : "Headlines could not be reached from this browser.",
+      reachable
+        ? `Checked meme, AI, Ethereum, robotics, prediction-market, and adjacent coverage from the last 12 hours. ${result.google} Google News item${result.google === 1 ? "" : "s"} came back before the major-narrative filter.`
+        : "Narrative coverage could not be reached from this browser.",
       now,
     );
     if (fresh.length === 0) {
       memory = draft;
       emit();
-      return { incoming: 0 };
+      return { incoming: 0, reason: "No major new token narrative. Nothing was added, and no alert was sent." };
     }
     const next = applyIncoming(
       { narratives: draft.desk.narratives, alerts: draft.pipelineAlerts, arms: draft.arms },
@@ -294,34 +296,98 @@ async function pullPersonHeadlines(now: string, announce: boolean): Promise<{ in
       optionsFor(draft.desk, draft.rules, now),
     );
     commitWorld(draft, next, now, "schedule");
-    for (const item of fresh) {
-      draft.desk.alerts.unshift({
-        id: `al_person_${item.providerItemId}`,
-        title: item.entities[0] ? `${item.entities[0]} is in the news` : item.title,
-        body: item.title,
-        status: "provisional",
-        reason: "watched_entity",
-        createdAt: now,
-        readAt: null,
-        eventType: "watched_entity",
-        narrativeId: draft.desk.narratives.find((narrative) => narrative.sources.some((source) => source.providerItemId === item.providerItemId))?.id ?? null,
-        sourceUrl: item.canonicalUrl,
-        deliveries: [{ channel: "browser", status: "pending", lastError: null }],
+    const history = draft.desk.settings.reportedNarratives ?? [];
+    const candidates = fresh.flatMap((item) => {
+      const narrative = draft.desk.narratives.find((entry) => entry.sources.some((source) => source.providerItemId === item.providerItemId));
+      if (!narrative || narrative.score.narrativeScore === null) return [];
+      const text = narrative.sources.map((source) => `${source.title} ${source.excerpt}`).join(" ");
+      const fit = assessStory(`${narrative.title} ${text}`);
+      return [{
+        id: narrative.id,
+        score: narrative.score.narrativeScore,
+        publishedAt: narrative.latestPublishedAt,
+        major: fit.major,
+        narrative,
+        fit,
+        url: item.canonicalUrl,
+      }];
+    });
+    const ranked = materialReports(candidates, history);
+    const chosen = ranked[0];
+    const chosenFull = chosen ? candidates.find((item) => item.id === chosen.id) : undefined;
+    let brief: ReturnType<typeof describeTokenNarrative> | null = null;
+    if (chosen && chosenFull) {
+      const topName = chosenFull.narrative.topName ?? "Untitled";
+      const topTicker = chosenFull.narrative.topTicker ?? "IDEA";
+      brief = describeTokenNarrative({
+        title: chosenFull.narrative.title,
+        name: topName,
+        ticker: topTicker,
+        publishedAt: chosenFull.narrative.latestPublishedAt,
+        fit: chosenFull.fit,
       });
+      draft.desk.settings.reportedNarratives = rememberReport(history, {
+        id: chosen.id,
+        score: chosen.score,
+        publishedAt: chosen.publishedAt,
+      });
+      if (announce) {
+        draft.desk.alerts.unshift({
+          id: `al_narrative_${chosen.id}_${now}`,
+          title: `${topName} (${topTicker})`,
+          body: `${brief.whyNow}\nTrigger: ${brief.trigger}\nConcept: ${brief.concept}`,
+          status: "provisional",
+          reason: "major_narrative",
+          createdAt: now,
+          readAt: null,
+          eventType: "new_candidate",
+          narrativeId: chosen.id,
+          sourceUrl: chosenFull.url,
+          deliveries: [{ channel: "browser", status: "pending", lastError: null }],
+        });
+        draft.desk.alerts = draft.desk.alerts.slice(0, 80);
+        notifyNarrative({ ...brief, name: topName, ticker: topTicker, url: chosenFull.url });
+      }
     }
-    draft.desk.alerts = draft.desk.alerts.slice(0, 80);
     memory = draft;
     emit();
-    const recent = [...fresh].sort((a, b) => (b.publishedAt ?? "").localeCompare(a.publishedAt ?? ""));
-    if (announce && recent.length > 0) notifyHeadlines(recent);
+    if (!chosen || !chosenFull || !brief) {
+      return {
+        incoming: fresh.length,
+        reason: `Added ${fresh.length} major candidate${fresh.length === 1 ? "" : "s"}. None were materially stronger or newer, so no alert was sent.`,
+      };
+    }
+    const label = `${chosenFull.narrative.topName ?? "Untitled"} (${chosenFull.narrative.topTicker ?? "IDEA"})`;
     return {
       incoming: fresh.length,
-      reason: `Found ${fresh.length} new headline${fresh.length === 1 ? "" : "s"} about watched people.`,
+      reason: announce
+        ? `New narrative: ${label}. ${brief.whyNow} Trigger: ${brief.trigger}`
+        : `Found ${label}. Manual scan keeps it on the board and does not send a desktop alert.`,
     };
   } catch {
     return { incoming: 0 };
   } finally {
     personBusy = false;
+  }
+}
+
+function rememberReport(history: ReportedNarrative[], report: ReportedNarrative): ReportedNarrative[] {
+  return [{ ...report, baseline: false }, ...history.filter((item) => item.id !== report.id)].slice(0, 80);
+}
+
+function ensureReportedBaseline(desk: DeskData) {
+  if (Array.isArray(desk.settings.reportedNarratives)) return;
+  desk.settings.reportedNarratives = desk.narratives.map((narrative) => ({
+    id: narrative.id,
+    score: narrative.score.narrativeScore ?? 0,
+    publishedAt: narrative.latestPublishedAt,
+    baseline: true,
+  }));
+}
+
+function ensureCategories(desk: DeskData) {
+  for (const category of ["meme", "ai", "robotics", "prediction"]) {
+    if (!desk.settings.categories.includes(category)) desk.settings.categories.push(category);
   }
 }
 
@@ -366,6 +432,8 @@ export function primeDesk(seed: DeskData) {
   }
   const now = new Date().toISOString();
   ensureMarketPeople(memory.desk);
+  ensureReportedBaseline(memory.desk);
+  ensureCategories(memory.desk);
   memory.desk.settings.autoScan = memory.desk.settings.autoScan === true;
   memory.desk.narratives = repaintTemplates(memory.desk.narratives, optionsFor(memory.desk, memory.rules, now));
   touchWorker(memory.desk, now);
@@ -412,7 +480,7 @@ export async function runPublishedAction(body: Record<string, unknown>): Promise
     touchWorker(draft.desk, now);
     memory = draft;
     emit();
-    if (!enabled) return { ok: true, reason: "Manual mode. Scan now fetches the latest headlines." };
+    if (!enabled) return { ok: true, reason: "Manual mode. Scan now looks for a major new token narrative." };
     const result = await runPublishedAction({ action: "scan", trigger: "schedule" });
     return { ok: true, incoming: result.incoming, reason: `Auto mode is on. ${result.reason ?? "The first check just ran."}` };
   }

@@ -31,7 +31,7 @@ export function AlertsDesk({ desk }: { desk: DeskData }) {
     void enableDesktopAlerts().then((granted) => {
       if (granted) notifyEnabled();
       setMessage(granted
-        ? "Desktop alerts are on. Keep this tab open and new headlines will ping you even in another app. They stop if you close the tab."
+        ? "Desktop alerts are on. Auto mode pings only for a major new token narrative, and stays quiet when nothing is stronger or newer. Keep this tab open."
         : "Permission was not granted.");
     });
   }
@@ -48,7 +48,7 @@ export function AlertsDesk({ desk }: { desk: DeskData }) {
   return (
     <div className="space-y-5">
       <h1 className="display text-4xl">Alerts</h1>
-      <p className="max-w-2xl text-sm text-muted">The inbox is on by default. With permission, desktop notifications appear while this tab stays open, including when you are in another app. They stop after the tab is closed.</p>
+      <p className="max-w-2xl text-sm text-muted">The inbox is on by default. Desktop notifications fire only for a major new Ethereum-friendly token narrative that is materially stronger or newer than ones already reported. They stay quiet otherwise, and they stop after this tab is closed.</p>
       <div className="flex flex-wrap gap-2">
         <Button type="button" variant="outline" onClick={enableBrowser}>Enable browser notifications</Button>
         <Button type="button" variant="outline" onClick={enableSound}>{soundOn ? "Sound armed" : "Enable sound"}</Button>
