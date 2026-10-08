@@ -5,18 +5,19 @@ import { GeneratedImage } from "@/components/generated-image";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { getSearchQuery, setSearchQuery, subscribeSearch } from "@/lib/desk-search";
 import { useLiveDesk } from "@/lib/use-live-desk";
 import { ageLabel, deskAction, isPublishedSnapshot } from "@/lib/utils";
 import type { DeskData } from "@/lib/types";
 import type { NarrativeView } from "@radar/core";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState, useSyncExternalStore } from "react";
 
 export function RadarApp({ desk, now, initialQuery = "" }: { desk: DeskData; now: string; initialQuery?: string }) {
   const router = useRouter();
   const liveDesk = useLiveDesk(desk);
-  const [query, setQuery] = useState(initialQuery);
+  const query = useSyncExternalStore(subscribeSearch, getSearchQuery, () => initialQuery);
   const [category, setCategory] = useState("all");
   const [lifecycle, setLifecycle] = useState("all");
   const [sort, setSort] = useState("recent");
@@ -27,9 +28,8 @@ export function RadarApp({ desk, now, initialQuery = "" }: { desk: DeskData; now
   const [compare, setCompare] = useState<string[]>([]);
 
   useEffect(() => {
-    if (initialQuery) return;
-    const q = new URLSearchParams(window.location.search).get("q");
-    if (q) setQuery(q);
+    const fromUrl = initialQuery || new URLSearchParams(window.location.search).get("q") || "";
+    if (fromUrl) setSearchQuery(fromUrl);
   }, [initialQuery]);
 
   useEffect(() => {
@@ -73,7 +73,7 @@ export function RadarApp({ desk, now, initialQuery = "" }: { desk: DeskData; now
 
   const rows = useMemo(() => {
     const filtered = liveDesk.narratives.filter((narrative) => {
-      const haystack = `${narrative.title} ${narrative.topName ?? ""} ${narrative.topTicker ?? ""}`.toLowerCase();
+      const haystack = `${narrative.title} ${narrative.topName ?? ""} ${narrative.topTicker ?? ""} ${narrative.factualSummary} ${narrative.entities.join(" ")}`.toLowerCase();
       if (query && !haystack.includes(query.toLowerCase())) return false;
       if (category !== "all" && narrative.category !== category) return false;
       if (lifecycle !== "all" && narrative.lifecycle !== lifecycle) return false;
@@ -117,7 +117,7 @@ export function RadarApp({ desk, now, initialQuery = "" }: { desk: DeskData; now
         </button>
       ) : null}
       <div className="grid gap-2 md:grid-cols-5">
-        <Input aria-label="Search candidates" placeholder="Search title, name, ticker" value={query} onChange={(event) => setQuery(event.target.value)} />
+        <Input aria-label="Search candidates" placeholder="Search title, name, ticker" value={query} onChange={(event) => setSearchQuery(event.target.value)} onKeyDown={(event) => { if (event.key === "Enter") event.preventDefault(); }} />
         <select aria-label="Category" className="h-10 w-full min-w-0 rounded-xl border border-line bg-card px-3" value={category} onChange={(event) => setCategory(event.target.value)}>
           <option value="all">All categories</option>
           {liveDesk.settings.categories.map((item) => <option key={item}>{item}</option>)}
@@ -138,14 +138,14 @@ export function RadarApp({ desk, now, initialQuery = "" }: { desk: DeskData; now
       </div>
       <div className="flex flex-wrap items-center gap-2 text-sm">
         <span className="text-muted">{rows.length} shown</span>
-        <Button type="button" variant="ghost" size="sm" onClick={() => { setQuery(""); setCategory("all"); setLifecycle("all"); setCoverage(0); setSort("recent"); }}>Reset filters</Button>
+        <Button type="button" variant="ghost" size="sm" onClick={() => { setSearchQuery(""); setCategory("all"); setLifecycle("all"); setCoverage(0); setSort("recent"); }}>Reset filters</Button>
         {compare.length > 0 ? <Link className="underline" href={`/compare?ids=${compare.join(",")}`}>Compare {compare.length}</Link> : null}
       </div>
       {message ? <p className="text-sm text-mint" role="status">{message}</p> : null}
       {rows.length === 0 ? (
         <div className="rounded-3xl border border-dashed border-line p-8">
           <h2 className="display text-2xl">No candidates in this slice</h2>
-          <p className="mt-2 max-w-lg text-sm text-muted">Nothing matched these filters. Reset them, run a scan, or in demo mode introduce the lighthouse cat fixture.</p>
+          <p className="mt-2 max-w-lg text-sm text-muted">{query ? `Nothing matched “${query}”. Change the keyword or reset the filters.` : "Nothing matched these filters. Reset them, run a scan, or in demo mode introduce the lighthouse cat fixture."}</p>
         </div>
       ) : (
         <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_380px]">

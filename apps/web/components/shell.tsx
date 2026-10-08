@@ -2,6 +2,7 @@
 
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { getSearchQuery, setSearchQuery, subscribeSearch } from "@/lib/desk-search";
 import { enableDesktopAlerts } from "@/lib/person-news";
 import { useLiveDesk } from "@/lib/use-live-desk";
 import { deskAction, formatWhen } from "@/lib/utils";
@@ -9,7 +10,7 @@ import type { DeskData } from "@/lib/types";
 import { Bell, Bookmark, Radar, Rss, Settings, SunMedium, MoonStar, Waves } from "lucide-react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import { useState, useSyncExternalStore } from "react";
+import { useEffect, useRef, useState, useSyncExternalStore } from "react";
 
 const themeListeners = new Set<() => void>();
 function subscribeTheme(callback: () => void) {
@@ -45,6 +46,11 @@ export function Shell({ desk, children, initialTheme = "dark", published = false
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
   const theme = useSyncExternalStore(subscribeTheme, getTheme, () => initialTheme);
+  const searchQuery = useSyncExternalStore(subscribeSearch, getSearchQuery, () => "");
+  const sentToRadar = useRef(false);
+  useEffect(() => {
+    if (normalizePath(pathname) === "/radar") sentToRadar.current = false;
+  }, [pathname]);
   const unread = liveDesk.alerts.filter((alert) => !alert.readAt && alert.status !== "suppressed").length;
   const auto = liveDesk.settings.autoScan === true;
   const status = liveDesk.settings.paused ? "Paused" : auto ? "Auto" : "Manual";
@@ -145,9 +151,23 @@ export function Shell({ desk, children, initialTheme = "dark", published = false
       <div>
         <header className="sticky top-0 z-20 flex flex-wrap items-center gap-3 border-b border-line bg-background/85 px-4 py-3 backdrop-blur">
           <p className={`text-sm font-medium ${tone}`} title="A connected event stream is not treated as proof that sources are healthy.">{status}</p>
-          <form action="/radar" method="get" className="min-w-40 flex-1">
-            <input name="q" aria-label="Search the desk" placeholder="Search title, name, ticker" className="h-8 w-full rounded-full border border-line bg-card px-3 text-sm" />
-          </form>
+          <input
+            aria-label="Search the desk"
+            placeholder="Search title, name, ticker"
+            value={searchQuery}
+            onChange={(event) => {
+              setSearchQuery(event.target.value);
+              if (!event.target.value || normalizePath(pathname) === "/radar" || sentToRadar.current) return;
+              sentToRadar.current = true;
+              router.push("/radar");
+            }}
+            onKeyDown={(event) => {
+              if (event.key !== "Enter") return;
+              event.preventDefault();
+              if (normalizePath(pathname) !== "/radar") router.push("/radar");
+            }}
+            className="h-8 min-w-40 flex-1 rounded-full border border-line bg-card px-3 text-sm"
+          />
           <p className="text-xs text-muted">Next scan {formatWhen(liveDesk.settings.nextDueAt, liveDesk.settings.timezone)}</p>
           <p className="text-xs text-muted">Last success {formatWhen(liveDesk.settings.lastSuccessfulAt, liveDesk.settings.timezone)}</p>
           <p className="text-xs text-muted">Last attempt {formatWhen(liveDesk.settings.lastAttemptedAt, liveDesk.settings.timezone)}</p>
