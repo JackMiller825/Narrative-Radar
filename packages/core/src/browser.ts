@@ -6,6 +6,6 @@ export { normalizeWeights } from "./scoring";
 export { suggestNames } from "./naming";
 export { illustrationCacheKey, pickMotif, pickPalette, renderBannerSvg, renderLogoSvg, textLayerKey } from "./assets";
 export { contentHash, excerpt, stripTags } from "./text";
-export { marketPeopleNames, mentionedPeople, resolveWatchedPeople, MARKET_PEOPLE } from "./people";
+export { marketPeopleNames, mentionedPeople, resolveWatchedPeople, storyMentionsPerson, MARKET_PEOPLE } from "./people";
 export { buildResearchPack } from "./export";
 export type { AlertArmState, NarrativeView, NormalizedItem, PipelineAlert, SchedulePreset } from "./types";

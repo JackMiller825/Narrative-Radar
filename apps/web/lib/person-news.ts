@@ -1,6 +1,6 @@
-import { contentHash, excerpt, mentionedPeople, resolveWatchedPeople, stripTags, type NormalizedItem } from "@radar/core/browser";
+import { contentHash, excerpt, resolveWatchedPeople, storyMentionsPerson, stripTags, type NormalizedItem } from "@radar/core/browser";
 
-const LOOKBACK_MS = 12 * 60 * 60 * 1000;
+const LOOKBACK_MS = 72 * 60 * 60 * 1000;
 export const NOTIFY_WINDOW_MS = 45 * 60 * 1000;
 
 type AlgoliaHit = {
@@ -19,7 +19,7 @@ export async function fetchPersonStories(watched: string[], now: string): Promis
       const url = new URL("https://hn.algolia.com/api/v1/search_by_date");
       url.searchParams.set("query", `"${person.name}"`);
       url.searchParams.set("tags", "story");
-      url.searchParams.set("hitsPerPage", "5");
+      url.searchParams.set("hitsPerPage", "8");
       const response = await fetch(url);
       if (!response.ok) return { items: [] as NormalizedItem[], failed: true };
       const body = (await response.json()) as { hits?: AlgoliaHit[] };
@@ -96,7 +96,7 @@ function toItem(hit: AlgoliaHit, person: { name: string; aliases: string[] }, no
   if (!publishedAt || new Date(publishedAt).getTime() < cutoff) return [];
   const body = stripTags(hit.story_text ?? "");
   const text = `${hit.title} ${body}`;
-  if (mentionedPeople(text, [person]).length === 0) return [];
+  if (storyMentionsPerson(text, person) === false) return [];
   const canonicalUrl = hit.url || `https://news.ycombinator.com/item?id=${hit.objectID}`;
   return [{
     provider: "hackernews",

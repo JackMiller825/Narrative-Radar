@@ -6,6 +6,7 @@ describe("market people", () => {
     const people = resolveWatchedPeople(["Vitalik Buterin", "Elon Musk"]);
     expect(mentionedPeople("Vitalik sketches a new Ethereum roadmap", people)).toEqual(["Vitalik Buterin"]);
     expect(mentionedPeople("Elon Musk comments on markets", people)).toEqual(["Elon Musk"]);
+    expect(mentionedPeople("Musk, Jensen Huang, Lisa Su Awarded National Medal of Science", people)).toEqual(["Elon Musk"]);
     expect(mentionedPeople("Blob fees fall again", people)).toEqual([]);
   });
 });

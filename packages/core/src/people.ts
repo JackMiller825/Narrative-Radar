@@ -37,6 +37,14 @@ export function resolveWatchedPeople(names: string[]): MarketPerson[] {
 }
 
 export function mentionedPeople(text: string, people: MarketPerson[]): string[] {
+  return people.filter((person) => storyMentionsPerson(text, person)).map((person) => person.name);
+}
+
+export function storyMentionsPerson(text: string, person: MarketPerson): boolean {
   const haystack = text.toLowerCase();
-  return people.filter((person) => person.aliases.some((alias) => haystack.includes(alias)) || haystack.includes(person.name.toLowerCase())).map((person) => person.name);
+  if (haystack.includes(person.name.toLowerCase())) return true;
+  if (person.aliases.some((alias) => haystack.includes(alias))) return true;
+  const last = person.name.split(" ").at(-1)?.toLowerCase() ?? "";
+  if (last.length < 4) return false;
+  return new RegExp(`\\b${last}\\b`, "i").test(text);
 }
